@@ -1,0 +1,29 @@
+{
+  "name": "psychojs",
+  "version": "1.0.0",
+  "description": "PsychoJS is a JavaScript library that makes it possible to run neuroscience, psychology, and psychophysics experiments in a browser. It is the online counterpart of the [PsychoPy](http://www.psychopy.org/) Python library. It is also a git submodule: [psychopy/psychojs](https://github.com/psychopy/psychojs)",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PSLLab/psychojs.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/PSLLab/psychojs/issues"
+  },
+  "homepage": "https://github.com/PSLLab/psychojs#readme",
+  "devDependencies": {
+    "@babel/core": "^7.10.3",
+    "@babel/preset-env": "^7.10.3",
+    "gulp": "^4.0.2",
+    "gulp-babel": "^8.0.0",
+    "gulp-plumber": "^1.2.1"
+  }
+}
