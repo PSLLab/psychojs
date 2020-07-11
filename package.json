@@ -7,7 +7,8 @@
     "doc": "docs"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "rollup --config"
   },
   "repository": {
     "type": "git",
@@ -22,8 +23,9 @@
   "devDependencies": {
     "@babel/core": "^7.10.3",
     "@babel/preset-env": "^7.10.3",
-    "gulp": "^4.0.2",
-    "gulp-babel": "^8.0.0",
-    "gulp-plumber": "^1.2.1"
-  }
+    "@rollup/plugin-babel": "^5.0.4",
+    "@rollup/plugin-multi-entry": "^3.0.1",
+    "rollup": "^2.21.0"
+  },
+  "dependencies": {}
 }
