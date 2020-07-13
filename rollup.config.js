@@ -1,5 +1,5 @@
-import multi from '@rollup/plugin-multi-entry';
-import { getBabelOutputPlugin } from '@rollup/plugin-babel';
+// import multi from '@rollup/plugin-multi-entry';
+// import { getBabelOutputPlugin } from '@rollup/plugin-babel';
 
 
 export default {
