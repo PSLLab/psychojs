@@ -1,6 +1,6 @@
 /**
  * Experiment Handler
- * 
+ *
  * @author Alain Pitiot
  * @version 2020.1
  * @copyright (c) 2020 Ilixa Ltd. ({@link http://ilixa.com})
@@ -17,9 +17,9 @@ import * as util from '../util/Util';
  * <p>An ExperimentHandler keeps track of multiple loops and handlers. It is particularly useful
  * for generating a single data file from an experiment with many different loops (e.g. interleaved
  * staircases or loops within loops.</p>
- * 
+ *
  * @name module:data.ExperimentHandler
- * @class 
+ * @class
  * @extends PsychObject
  * @param {Object} options
  * @param {module:core.PsychoJS} options.psychoJS - the PsychoJS instance
@@ -30,7 +30,7 @@ export class ExperimentHandler extends PsychObject {
 
 	/**
 	 * Getter for experimentEnded.
-	 * 
+	 *
 	 * @name module:core.Window#experimentEnded
 	 * @function
 	 * @public
@@ -39,7 +39,7 @@ export class ExperimentHandler extends PsychObject {
 
 	/**
 	 * Setter for experimentEnded.
-	 * 
+	 *
 	 * @name module:core.Window#experimentEnded
 	 * @function
 	 * @public
@@ -281,7 +281,9 @@ export class ExperimentHandler extends PsychObject {
 			const key = __participant + '_' + __experimentName + '_' + __datetime + '.csv';
 			if (this._psychoJS.getEnvironment() === ExperimentHandler.Environment.SERVER && this._psychoJS.config.experiment.status === 'RUNNING')
 				return /*await*/ this._psychoJS.serverManager.uploadData(key, csv);
-			else
+			else if (this._psychoJS.getEnvironment() === ExperimentHandler.Environment.JATOS)
+        return await jatos.uploadResultFile(csv, key);
+      else
 				util.offerDataForDownload(key, csv, 'text/csv');
 		}
 
@@ -313,7 +315,7 @@ export class ExperimentHandler extends PsychObject {
 	/**
 	 * Get the attribute names and values for the current trial of a given loop.
 	 * <p> Only only info relating to the trial execution are returned.</p>
-	 * 
+	 *
 	 * @name module:data.ExperimentHandler#_getLoopAttributes
 	 * @function
 	 * @static
@@ -353,7 +355,7 @@ export class ExperimentHandler extends PsychObject {
 				else:
 						names.append(loopName+'.thisTrial')
 						vals.append(trial)
-						
+
 		// single StairHandler
 		elif hasattr(loop, 'intensities'):
 				names.append(loopName+'.intensity')
@@ -370,7 +372,7 @@ export class ExperimentHandler extends PsychObject {
 
 /**
  * Experiment result format
- * 
+ *
  * @name module:core.ServerManager#SaveFormat
  * @enum {Symbol}
  * @readonly
@@ -398,5 +400,6 @@ ExperimentHandler.SaveFormat = {
  */
 ExperimentHandler.Environment = {
 	SERVER: Symbol.for('SERVER'),
-	LOCAL: Symbol.for('LOCAL')
+	LOCAL: Symbol.for('LOCAL'),
+  JATOS: Symbol.for('JATOS')
 };

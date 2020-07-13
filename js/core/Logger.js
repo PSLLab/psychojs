@@ -1,6 +1,6 @@
 /**
  * Logger
- * 
+ *
  * @author Alain Pitiot
  * @version 2020.1
  * @copyright (c) 2020 Ilixa Ltd. ({@link http://ilixa.com})
@@ -16,9 +16,9 @@ import { ExperimentHandler } from '../data/ExperimentHandler';
 /**
  * <p>This class handles a variety of loggers, e.g. a browser console one (mostly for debugging),
  * a remote one, etc.</p>
- * 
+ *
  * <p>Note: we use log4javascript for the console logger, and our own for the server logger.</p>
- * 
+ *
  * @name module:core.Logger
  * @class
  * @param {*} threshold - the logging threshold, e.g. log4javascript.Level.ERROR
@@ -181,7 +181,38 @@ export class Logger {
 			{
 				return await this._psychoJS.serverManager.uploadLog(formattedLogs, false);
 			}
-		}
+		} else if (this._psychoJS.getEnvironment() === ExperimentHandler.Environment.JATOS) {
+      const info = this._psychoJS.experiment.extraInfo;
+   		const participant = ((typeof info.participant === 'string' && info.participant.length > 0) ? info.participant : 'PARTICIPANT');
+   		const experimentName = (typeof info.expName !== 'undefined') ? info.expName : this._psychoJS.config.experiment.name;
+   		const datetime = ((typeof info.date !== 'undefined') ? info.date : MonotonicClock.getDateStr());
+   		const filename = participant + '_' + experimentName + '_' + datetime + '.log';
+      const compressed_filename = filename + '.Z';
+      if (typeof pako !== 'undefined')
+ 			{
+ 				try
+ 				{
+ 					const utf16DeflatedLogs = pako.deflate(formattedLogs, {to: 'string'});
+ 					// const utf16DeflatedLogs = pako.deflate(unescape(encodeURIComponent(formattedLogs)), {to: 'string'});
+ 					const base64DeflatedLogs = btoa(utf16DeflatedLogs);
+ 					// return await this._psychoJS.serverManager.uploadLog(base64DeflatedLogs, true);
+          return await jatos.uploadResultFile(base64DeflatedLogs, compressed_filename);
+
+ 				}
+ 				catch (error)
+ 				{
+ 					console.error('log compression error:', error);
+ 					// throw Object.assign(response, {error: error});
+          return await jatos.uploadResultFile(base64DeflatedLogs, filename);
+ 				}
+ 			}
+ 			else
+ 			// the pako compression library is not present, we do not compress the logs:
+ 			{
+ 				// return await this._psychoJS.serverManager.uploadLog(formattedLogs, false);
+        return await jatos.uploadResultFile(base64DeflatedLogs, filename);
+ 			}
+    }
 		else
 		{
 			this._psychoJS.logger.debug('\n' + formattedLogs);
@@ -192,7 +223,7 @@ export class Logger {
 
 	/**
 	 * Create a custom console layout.
-	 * 
+	 *
 	 * @name module:core.Logger#_customConsoleLayout
 	 * @private
 	 * @return {*} the custom layout

@@ -1,6 +1,6 @@
 /**
  * Manager responsible for the communication between the experiment running in the participant's browser and the remote PsychoJS manager running on the remote https://pavlovia.org server.
- * 
+ *
  * @author Alain Pitiot
  * @version 2020.1
  * @copyright (c) 2020 Ilixa Ltd. ({@link http://ilixa.com})
@@ -21,7 +21,7 @@ import {MonotonicClock} from "../util/Clock";
  * <p>This manager handles all communications between the experiment running in the participant's browser and the remote PsychoJS manager running on the [pavlovia.org]{@link http://pavlovia.org} server, <em>in an asynchronous manner</em>.</p>
  * <p>It is responsible for reading the configuration file of an experiment, for opening and closing a session, for listing and downloading resources, and for uploading results and log.</p>
  * <p>Note: The Server Manager uses [Promises]{@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise} to deal with asynchronicity, is mostly called by {@link PsychoJS}, and is not exposed to the experiment code.</p>
- * 
+ *
  * @name module:core.ServerManager
  * @class
  * @extends PsychObject
@@ -30,7 +30,7 @@ import {MonotonicClock} from "../util/Clock";
  * @param {boolean} [options.autoLog= false] - whether or not to log
  */
 export class ServerManager extends PsychObject {
-	
+
 	constructor({
 		psychoJS,
 		autoLog = false
@@ -58,12 +58,12 @@ export class ServerManager extends PsychObject {
 	 */
 	/**
 	 * Read the configuration file for the experiment.
-	 * 
+	 *
 	 * @name module:core.ServerManager#getConfiguration
 	 * @function
 	 * @public
 	 * @param {string} configURL - the URL of the configuration file
-	 * 
+	 *
 	 * @returns {Promise<ServerManager.GetConfigurationPromise>} the response
 	 */
 	getConfiguration(configURL) {
@@ -98,7 +98,7 @@ export class ServerManager extends PsychObject {
 	 */
 	/**
 	 * Open a session for this experiment on the remote PsychoJS manager.
-	 * 
+	 *
 	 * @name module:core.ServerManager#openSession
 	 * @function
 	 * @public
@@ -170,7 +170,7 @@ export class ServerManager extends PsychObject {
 	 */
 	/**
 	 * Close the session for this experiment on the remote PsychoJS manager.
-	 * 
+	 *
 	 * @name module:core.ServerManager#closeSession
 	 * @function
 	 * @public
@@ -230,7 +230,7 @@ export class ServerManager extends PsychObject {
 
 	/**
 	 * Get the value of a resource.
-	 * 
+	 *
 	 * @name module:core.ServerManager#getResource
 	 * @function
 	 * @public
@@ -252,7 +252,7 @@ export class ServerManager extends PsychObject {
 
 	/**
 	 * Set the resource manager status.
-	 * 
+	 *
 	 * @name module:core.ServerManager#setStatus
 	 * @function
 	 * @public
@@ -280,7 +280,7 @@ export class ServerManager extends PsychObject {
 
 	/**
 	 * Reset the resource manager status to ServerManager.Status.READY.
-	 * 
+	 *
 	 * @name module:core.ServerManager#resetStatus
 	 * @function
 	 * @public
@@ -355,7 +355,7 @@ export class ServerManager extends PsychObject {
 		download();
 	}
 
-	
+
 	/**
 	 * @typedef ServerManager.UploadDataPromise
 	 * @property {string} origin the calling method
@@ -364,13 +364,13 @@ export class ServerManager extends PsychObject {
 	 */
 	/**
 	 * Asynchronously upload experiment data to the remote PsychoJS manager.
-	 * 
+	 *
 	 * @name module:core.ServerManager#uploadData
 	 * @function
 	 * @public
 	 * @param {string} key - the data key (e.g. the name of .csv file)
 	 * @param {string} value - the data value (e.g. a string containing the .csv header and records)
-	 * 
+	 *
 	 * @returns {Promise<ServerManager.UploadDataPromise>} the response
 	 */
 	uploadData(key, value)
@@ -549,9 +549,9 @@ export class ServerManager extends PsychObject {
 
 	/**
 	 * Download the resources previously registered.
-	 * 
+	 *
 	 * <p>Note: we use the [preloadjs library]{@link https://www.createjs.com/preloadjs}.</p>
-	 * 
+	 *
 	 * @name module:core.ServerManager#_downloadRegisteredResources
 	 * @function
 	 * @private
@@ -568,6 +568,9 @@ export class ServerManager extends PsychObject {
 
 		// (*) set-up preload.js:
 		this._resourceQueue = new createjs.LoadQueue(true); //, this._psychoJS.config.experiment.resourceDirectory);
+    if (this._psychoJS.config.environment === ExperimentHandler.Environment.JATOS) {
+      this._resourceQueue.setMaxConnections(10);
+    }
 
 		const self = this;
 		this._resourceQueue.addEventListener("filestart", event => {
@@ -684,9 +687,9 @@ export class ServerManager extends PsychObject {
 
 /**
  * Server event
- * 
+ *
  * <p>A server event is emitted by the manager to inform its listeners of either a change of status, or of a resource related event (e.g. download started, download is completed).</p>
- * 
+ *
  * @name module:core.ServerManager#Event
  * @enum {Symbol}
  * @readonly
@@ -723,7 +726,7 @@ ServerManager.Event = {
 
 /**
  * Server status
- * 
+ *
  * @name module:core.ServerManager#Status
  * @enum {Symbol}
  * @readonly
