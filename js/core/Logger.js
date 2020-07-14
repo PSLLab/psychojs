@@ -111,13 +111,15 @@ export class Logger {
 	{
 		if (typeof time === 'undefined')
 			time = MonotonicClock.getReferenceTime();
-
-		this._serverLogs.push({
-			msg,
-			level,
-			time,
-			obj: util.toString(obj)
-		});
+    // hack to disable execessive logging when desired
+    if (this.consoleLogger.getLevel() !== log4javascript.Level.ERROR) {
+  		this._serverLogs.push({
+  			msg,
+  			level,
+  			time,
+  			obj: util.toString(obj)
+  		});
+    }
 
 	}
 

@@ -62,11 +62,18 @@ export class PsychoJS
 	constructor({
 								debug = true,
 								collectIP = false,
-								topLevelStatus = true
+								topLevelStatus = true,
+                disableLog = false
 	} = {})
 	{
 		// logging:
-		this._logger = new Logger(this, (debug) ? log4javascript.Level.DEBUG : log4javascript.Level.INFO);
+    let logLevel = log4javascript.Level.INFO;
+    if (debug) {
+      logLevel = log4javascript.Level.DEBUG;
+    } else if (disableLog) {
+      logLevel = log4javascript.Level.ERROR;
+    }
+		this._logger = new Logger(this, logLevel);
 		this._captureErrors();
 
 		// detect the browser:
