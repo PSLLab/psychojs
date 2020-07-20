@@ -1,6 +1,6 @@
 /**
  * Various utilities.
- * 
+ *
  * @author Alain Pitiot
  * @version 2020.1
  * @copyright (c) 2020 Ilixa Ltd. ({@link http://ilixa.com})
@@ -24,7 +24,7 @@
  * class NewClass extends mix(BaseClass).with(Mixin1, Mixin2) { ... }
  */
 export let mix = (superclass) => new MixinBuilder(superclass);
-class MixinBuilder {  
+class MixinBuilder {
   constructor(superclass) {
     this.superclass = superclass;
   }
@@ -34,7 +34,7 @@ class MixinBuilder {
 	 * @param mixins
 	 * @returns {*}
 	 */
-  with(...mixins) { 
+  with(...mixins) {
     return mixins.reduce((c, mixin) => mixin(c), this.superclass);
   }
 }
@@ -91,7 +91,7 @@ export function getErrorStack()
 		// we need to remove the second line since it references getErrorStack:
 		let stack = error.stack.split("\n");
 		stack.splice(1, 1);
-			
+
 		return JSON.stringify(stack.join('\n'));
 	}
 }
@@ -139,7 +139,7 @@ export function detectBrowser()
 	const isFirefox = (typeof InstallTrigger !== 'undefined');
 	if (isFirefox) return 'Firefox';
 
-	// Safari 3.0+ "[object HTMLElementConstructor]" 
+	// Safari 3.0+ "[object HTMLElementConstructor]"
 	const isSafari = /constructor/i.test(window.HTMLElement) || (function (p) { return p.toString() === "[object SafariRemoteNotification]"; })(!window['safari'] || (typeof safari !== 'undefined' && safari.pushNotification));
 	if (isSafari) return 'Safari';
 
@@ -220,7 +220,7 @@ export function IsPointInsidePolygon(point, vertices)
 {
 	const x = point[0];
 	const y = point[1];
-    
+
 	let isInside = false;
 	for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++)
 	{
@@ -229,7 +229,7 @@ export function IsPointInsidePolygon(point, vertices)
     const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
     if (intersect) isInside = !isInside;
   }
-    
+
   return isInside;
 }
 
@@ -305,7 +305,7 @@ export function	getPositionFromObject(object, units)
 export function to_px(pos, posUnit, win)
 {
 	const response = { origin: 'util.to_px', context: 'when converting a position to pixel units' };
-	
+
 	if (posUnit === 'pix')
 		return pos;
 	else if (posUnit === 'norm')
@@ -569,12 +569,12 @@ export function isInt(obj) {
  * @function
  * @public
  * @returns {URLSearchParams} the iterable URLSearchParams
- * 
+ *
  * @example
  * const urlParameters = util.getUrlParameters();
  * for (const [key, value] of urlParameters)
  *   console.log(key + ' = ' + value);
- * 
+ *
  */
 export function getUrlParameters()
 {
@@ -743,4 +743,59 @@ export function offerDataForDownload(filename, data, type) {
 		elem.click();
 		document.body.removeChild(elem);
 	}
+}
+
+
+/**
+ * Adds a button to the document that if pressed calls jatos.abortStudy.
+ * By default this button is in the bottom-right corner but this and
+ * other properties can be configured.
+ *
+ * @param {object optional} config - Config object
+ * 		text: Button text
+ * 		confirm: Should the worker be asked for confirmation? Default true.
+ * 		confirmText: Confirmation text
+ * 		tooltip: Tooltip text
+ * 		msg: Message to be send back to JATOS to be logged
+ * 		style: Additional CSS styles
+ */
+ // mon_function is probably quitPsychoJS - needs to take a message and a boolean
+export function addAbortButton(config, mon_function) {
+  var buttonText = (config && typeof config.text == "string") ?
+      config.text : "Cancel";
+  var confirm = (config && typeof config.confirm == "boolean") ?
+      config.confirm : true;
+  var confirmText = (config && typeof config.confirmText == "string") ?
+      config.confirmText : "Do you really want to cancel this study?";
+  var tooltip = (config && typeof config.tooltip == "string") ?
+      config.tooltip : "Cancels this study and deletes all already submitted data";
+  var msg = (config && typeof config.msg == "string") ?
+      config.msg : "Worker decided to abort";
+  var style = 'color:black;' +
+      'background-color: red;' +
+      'font-family:Sans-Serif;' +
+      'font-size:20px;' +
+      'letter-spacing:2px;' +
+      'position:fixed;' +
+      'margin:2em 0 0 2em;' +
+      'bottom:1em;' +
+      'right:1em;' +
+      'opacity:1;' +
+      'z-index:100;' +
+      'cursor:pointer;';
+      // 'text-shadow:-1px 0 white, 0 1px white, 1px 0 white, 0 -1px white;';
+  if (config && typeof config.style == "string") style += ";" + config.style;
+
+  var text = document.createTextNode(buttonText);
+  var buttonDiv = document.createElement('div');
+  buttonDiv.appendChild(text);
+  buttonDiv.style.cssText = style;
+  buttonDiv.setAttribute("title", tooltip);
+  buttonDiv.addEventListener("click", function () {
+    if (!confirm || window.confirm(confirmText)) {
+      mon_function(msg, false);
+    }
+  });
+
+  document.body.appendChild(buttonDiv);
 }

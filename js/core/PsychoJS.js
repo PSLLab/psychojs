@@ -405,10 +405,13 @@ export class PsychoJS
 					this._window.closeFullScreen();
 
 					// redirect if redirection URLs have been provided:
-					if (isCompleted && typeof self._completionUrl !== 'undefined')
-						window.location = self._completionUrl;
-					else if (!isCompleted && typeof self._cancellationUrl !== 'undefined')
-						window.location = self._cancellationUrl;
+          // for JATOS, we'll use the functionality built into jatos library
+          if (this.getEnvironment() !== ExperimentHandler.Environment.JATOS) {
+  					if (isCompleted && typeof self._completionUrl !== 'undefined')
+  						window.location = self._completionUrl;
+  					else if (!isCompleted && typeof self._cancellationUrl !== 'undefined')
+  						window.location = self._cancellationUrl;
+          }
 				}
 			});
 
