@@ -19,7 +19,7 @@ import * as util from '../util/Util';
 /**
  * @class
  * Graphic User Interface
- * 
+ *
  * @name module:core.GUI
  * @class
  * @param {module:core.PsychoJS} psychoJS the PsychoJS instance
@@ -46,7 +46,7 @@ export class GUI
 	 * <p>Create a dialog box that (a) enables the participant to set some
 	 * experimental values (e.g. the session name), (b) shows progress of resource
 	 * download, and (c) enables the participant to cancel the experiment.</p>
-	 * 
+	 *
 	 * <b>Setting experiment values</b>
 	 * <p>DlgFromDict displays an input field for all values in the dictionary.
 	 * It is possible to specify default values e.g.:</p>
@@ -55,7 +55,7 @@ export class GUI
 	 * psychoJS.schedule(psychoJS.gui.DlgFromDict({dictionary: expInfo, title: expName}));</code>
 	 * <p>If the participant cancels (by pressing Cancel or by closing the dialog box), then
 	 * the dictionary remains unchanged.</p>
-	 * 
+	 *
 	 * @name module:core.GUI#DlgFromDict
 	 * @function
 	 * @public
@@ -210,57 +210,104 @@ export class GUI
 				self._dialogComponent.button = 'Cancel';
 				self._estimateDialogScalingFactor();
 				const dialogSize = self._getDialogSize();
-				$("#expDialog").dialog({
-					width: dialogSize[0],
-					maxHeight: dialogSize[1],
+        if (self._psychoJS.getEnvironment() === ExperimentHandler.Environment.JATOS) {
 
-					autoOpen: true,
-					modal: true,
-					closeOnEscape: false,
-					resizable: false,
+    				$("#expDialog").dialog({
+    					width: dialogSize[0],
+    					maxHeight: dialogSize[1],
 
-					buttons: [
-						{
-							id: "buttonOk",
-							text: "Ok",
-							click: function () {
+    					autoOpen: true,
+    					modal: true,
+    					closeOnEscape: false,
+    					resizable: false,
 
-								// update dictionary:
-								for (const key in dictionary) {
-									const input = document.getElementById(key + "_id");
-									if (input)
-										dictionary[key] = input.value;
-								}
+    					buttons: [
+    						{
+    							id: "buttonOk",
+    							text: "Ok",
+    							click: function () {
 
-								self._dialogComponent.button = 'OK';
-								$("#expDialog").dialog("close");
+    								// update dictionary:
+    								for (const key in dictionary) {
+    									const input = document.getElementById(key + "_id");
+    									if (input)
+    										dictionary[key] = input.value;
+    								}
 
-								// switch to full screen if requested:
-								self._psychoJS.window.adjustScreenSize();
-							}
-						},
-						{
-							id: "buttonCancel",
-							text: "Cancel",
-							click: function () {
-								self._dialogComponent.button = 'Cancel';
-								$("#expDialog").dialog("close");
-							}
-						}
-					],
+    								self._dialogComponent.button = 'OK';
+    								$("#expDialog").dialog("close");
 
-					// open the dialog in the middle of the screen:
-					open: self._onDialogOpen('#expDialog'),
+    								// switch to full screen if requested:
+    								self._psychoJS.window.adjustScreenSize();
+    							}
+    						}
+    					],
 
-					// close is called by both buttons and when the user clicks on the cross:
-					close: function () {
-						//$.unblockUI();
-						self._dialogComponent.status = PsychoJS.Status.FINISHED;
-					}
+    					// open the dialog in the middle of the screen:
+    					open: self._onDialogOpen('#expDialog'),
 
-				})
-				// change colour of title bar
-					.prev(".ui-dialog-titlebar").css("background", "green");
+    					// close is called by both buttons and when the user clicks on the cross:
+    					close: function () {
+    						//$.unblockUI();
+    						self._dialogComponent.status = PsychoJS.Status.FINISHED;
+    					}
+
+    				})
+    				// change colour of title bar
+    					.prev(".ui-dialog-titlebar").css("background", "green");
+        } else {
+  				$("#expDialog").dialog({
+  					width: dialogSize[0],
+  					maxHeight: dialogSize[1],
+
+  					autoOpen: true,
+  					modal: true,
+  					closeOnEscape: false,
+  					resizable: false,
+
+  					buttons: [
+  						{
+  							id: "buttonOk",
+  							text: "Ok",
+  							click: function () {
+
+  								// update dictionary:
+  								for (const key in dictionary) {
+  									const input = document.getElementById(key + "_id");
+  									if (input)
+  										dictionary[key] = input.value;
+  								}
+
+  								self._dialogComponent.button = 'OK';
+  								$("#expDialog").dialog("close");
+
+  								// switch to full screen if requested:
+  								self._psychoJS.window.adjustScreenSize();
+  							}
+  						},
+  						{
+  							id: "buttonCancel",
+  							text: "Cancel",
+  							click: function () {
+  								self._dialogComponent.button = 'Cancel';
+  								$("#expDialog").dialog("close");
+  							}
+  						}
+  					],
+
+  					// open the dialog in the middle of the screen:
+  					open: self._onDialogOpen('#expDialog'),
+
+  					// close is called by both buttons and when the user clicks on the cross:
+  					close: function () {
+  						//$.unblockUI();
+  						self._dialogComponent.status = PsychoJS.Status.FINISHED;
+  					}
+
+  				})
+  				// change colour of title bar
+  					.prev(".ui-dialog-titlebar").css("background", "green");
+        }
 
 
 				// update the OK button status:
@@ -293,9 +340,9 @@ export class GUI
 	 */
 	/**
 	 * Show a message to the participant in a dialog box.
-	 * 
+	 *
 	 * <p>This function can be used to display both warning and error messages.</p>
-	 * 
+	 *
 	 * @name module:core.GUI#dialog
 	 * @function
 	 * @public
@@ -348,7 +395,7 @@ export class GUI
 				{
 					stackCode += '<li><b>' + error  + '</b></li>';
 					break;
-				}		
+				}
 			}
 			stackCode += '</ul>';
 
@@ -391,7 +438,7 @@ export class GUI
 		// replace root by the html code:
 		const dialogElement = document.getElementById('root');
 		dialogElement.innerHTML = htmlCode;
-		
+
 		// init and open the dialog box:
 		this._estimateDialogScalingFactor();
 		const dialogSize = this._getDialogSize();
@@ -506,7 +553,7 @@ export class GUI
 
 	/**
 	 * Destroy the currently opened dialog box.
-	 * 
+	 *
 	 * @name module:core.GUI#dialog
 	 * @function
 	 * @public
