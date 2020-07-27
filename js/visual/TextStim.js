@@ -1,6 +1,6 @@
 /**
  * Text Stimulus.
- * 
+ *
  * @author Alain Pitiot
  * @version 2020.1
  * @copyright (c) 2020 Ilixa Ltd. ({@link http://ilixa.com})
@@ -22,7 +22,7 @@ import * as util from '../util/Util';
  * @param {Object} options
  * @param {String} options.name - the name used when logging messages from this stimulus
  * @param {Window} options.win - the associated Window
- * @param {string} [options.text="Hello World"] - the text to be rendered 
+ * @param {string} [options.text="Hello World"] - the text to be rendered
  * @param {string} [options.font= "Arial"] - the text font
  * @param {Array.<number>} [options.pos= [0, 0]] - the position of the center of the text
  * @param {Color} [options.color= Color('white')] the background color
@@ -38,9 +38,9 @@ import * as util from '../util/Util';
  * @param {boolean} wrapWidth - whether or not to wrap the text horizontally
  * @param {boolean} [flipHoriz= false] - whether or not to flip the text horizontally
  * @param {boolean} [flipVert= false] - whether or not to flip the text vertically
- * @param {boolean} [options.autoDraw= false] - whether or not the stimulus should be automatically drawn on every frame flip 
+ * @param {boolean} [options.autoDraw= false] - whether or not the stimulus should be automatically drawn on every frame flip
  * @param {boolean} [options.autoLog= false] - whether or not to log
- * 
+ *
  * @todo vertical alignment, and orientation are currently NOT implemented
  */
 export class TextStim extends util.mix(VisualStim).with(ColorMixin)
@@ -59,7 +59,8 @@ export class TextStim extends util.mix(VisualStim).with(ColorMixin)
 		height = 0.1,
 		bold = false,
 		italic = false,
-		alignHoriz = 'left',
+		alignHoriz = 'center',
+    alignLinesHoriz = 'left',
 		alignVert = 'center',
 		wrapWidth,
 		flipHoriz = false,
@@ -70,7 +71,7 @@ export class TextStim extends util.mix(VisualStim).with(ColorMixin)
 	{
 		super({ name, win, units, ori, opacity, pos, autoDraw, autoLog });
 
-		this._addAttributes(TextStim, text, font, color, contrast, height, bold, italic, alignHoriz, alignVert, wrapWidth, flipHoriz, flipVert);
+		this._addAttributes(TextStim, text, font, color, contrast, height, bold, italic, alignHoriz, alignLinesHoriz, alignVert, wrapWidth, flipHoriz, flipVert);
 
 		if (this._autoLog)
 			this._psychoJS.experimentLogger.exp(`Created ${this.name} = ${this.toString()}`);
@@ -79,7 +80,7 @@ export class TextStim extends util.mix(VisualStim).with(ColorMixin)
 
 	/**
 	 * Setter for the text attribute.
-	 * 
+	 *
 	 * @name module:visual.TextStim#setText
 	 * @public
 	 * @param {string} text - the text
@@ -96,7 +97,7 @@ export class TextStim extends util.mix(VisualStim).with(ColorMixin)
 
 	/**
 	 * Setter for the alignHoriz attribute.
-	 * 
+	 *
 	 * @name module:visual.TextStim#setAlignHoriz
 	 * @public
 	 * @param {string} alignHoriz - the text horizontal alignment, e.g. 'center'
@@ -112,7 +113,7 @@ export class TextStim extends util.mix(VisualStim).with(ColorMixin)
 
 	/**
 	 * Setter for the wrapWidth attribute.
-	 * 
+	 *
 	 * @name module:visual.TextStim#setWrapWidth
 	 * @public
 	 * @param {boolean} wrapWidth - whether or not to wrap the text at the given width
@@ -135,7 +136,7 @@ export class TextStim extends util.mix(VisualStim).with(ColorMixin)
 
 	/**
 	 * Setter for the height attribute.
-	 * 
+	 *
 	 * @name module:visual.TextStim#setHeight
 	 * @public
 	 * @param {number} height - text height
@@ -158,7 +159,7 @@ export class TextStim extends util.mix(VisualStim).with(ColorMixin)
 
 	/**
 	 * Setter for the italic attribute.
-	 * 
+	 *
 	 * @name module:visual.TextStim#setItalic
 	 * @public
 	 * @param {boolean} italic - whether or not the text is italic
@@ -174,7 +175,7 @@ export class TextStim extends util.mix(VisualStim).with(ColorMixin)
 
 	/**
 	 * Setter for the bold attribute.
-	 * 
+	 *
 	 * @name module:visual.TextStim#setBold
 	 * @public
 	 * @param {boolean} bold - whether or not the text is bold
@@ -190,7 +191,7 @@ export class TextStim extends util.mix(VisualStim).with(ColorMixin)
 
 	/**
 	 * Setter for the flipVert attribute.
-	 * 
+	 *
 	 * @name module:visual.TextStim#setFlipVert
 	 * @public
 	 * @param {boolean} flipVert - whether or not to flip vertically
@@ -206,7 +207,7 @@ export class TextStim extends util.mix(VisualStim).with(ColorMixin)
 
 	/**
 	 * Setter for the flipHoriz attribute.
-	 * 
+	 *
 	 * @name module:visual.TextStim#setFlipHoriz
 	 * @public
 	 * @param {boolean} flipHoriz - whether or not to flip horizontally
@@ -222,13 +223,13 @@ export class TextStim extends util.mix(VisualStim).with(ColorMixin)
 
 	/**
 	 * Determine whether an object is inside the bounding box of the text.
-	 * 
+	 *
 	 * @name module:visual.TextStim#contains
 	 * @public
 	 * @param {Object} object - the object
 	 * @param {string} units - the units
 	 * @return {boolean} whether or not the object is inside the bounding box of the text
-	 * 
+	 *
 	 * @todo this is currently NOT implemented
 	 */
 	contains(object, units) {
@@ -245,10 +246,10 @@ export class TextStim extends util.mix(VisualStim).with(ColorMixin)
 
 	/**
 	 * Update the stimulus, if necessary.
-	 * 
+	 *
 	 * @name module:visual.TextStim#_updateIfNeeded
 	 * @private
-	 * 
+	 *
 	 * @todo take size into account
 	 */
 	_updateIfNeeded()
@@ -261,19 +262,28 @@ export class TextStim extends util.mix(VisualStim).with(ColorMixin)
 
 		const fontSize = Math.round(this._heightPix);
 		let color = this.getContrastedColor(this._color, this._contrast);
-		const font =
-			(this._bold ? 'bold ' : '') +
-			(this._italic ? 'italic ' : '') +
-			fontSize + 'px ' + this._font;
+		// const font =
+		// 	(this._bold ? 'bold ' : '') +
+		// 	(this._italic ? 'italic ' : '') +
+		// 	fontSize + 'px ' + this._font;
+    let fontStyle = (this._italic ? 'italic ' : '');
+    let fontWeight = (this._bold ? 'bold ' : '');
 		this._pixi = new PIXI.Text(this._text, {
-			font: font,
+      fontFamily: this._font,
+      fontSize: fontSize,
+      fontStyle: fontStyle,
+      fontWeight: fontWeight,
 			fill: color.hex,
-			align: this._alignHoriz,
+			align: this._alignLinesHoriz,
 			wordWrap: (typeof this._wrapWidth !== 'undefined'),
 			wordWrapWidth: this._wrapWidth ? this._getHorLengthPix(this._wrapWidth) : 0
 		});
 
-		this._pixi.anchor.x = 0.5;
+    if (this._alignHoriz === 'left') {
+	    this._pixi.anchor.x = 0;
+    } else {
+      this._pixi.anchor.x = 0.5;
+    }
 		this._pixi.anchor.y = 0.5;
 
 		this._pixi.scale.x = this._flipHoriz ? -1 : 1;
