@@ -286,7 +286,30 @@ export class PsychoJS
 					if (typeof self._window !== 'undefined')
 						self._window.close();
 				});
-			}
+			} else if (this.getEnvironment() === ExperimentHandler.Environment.JATOS) {
+        this.beforeunloadCallback = (event) =>
+				{
+					// preventDefault should ensure that the user gets prompted:
+					event.preventDefault();
+          this._experiment.save({sync: true});
+          this._logger.flush({sync: true});
+
+					// Chrome requires returnValue to be set:
+					event.returnValue = '';
+				};
+				window.addEventListener('beforeunload', this.beforeunloadCallback);
+
+        window.addEventListener('unload', (event) =>
+				{
+          // this._experiment.save({sync: true});
+          // this._logger.flush({sync: true});
+
+					if (typeof self._window !== 'undefined')
+					{
+						self._window.close();
+					}
+				});
+      }
 
 
 			// start the asynchronous download of resources:
@@ -382,6 +405,11 @@ export class PsychoJS
 			// close the session:
 			if (this.getEnvironment() === ExperimentHandler.Environment.SERVER) {
 				await this._serverManager.closeSession(isCompleted);
+			}
+
+      if (this.getEnvironment() === ExperimentHandler.Environment.SERVER ||
+          this.getEnvironment() === ExperimentHandler.Environment.JATOS)	{
+				window.removeEventListener('beforeunload', this.beforeunloadCallback);
 			}
 
 			// thank participant for waiting and either quit or redirect:

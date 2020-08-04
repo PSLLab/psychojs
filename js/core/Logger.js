@@ -42,6 +42,7 @@ export class Logger {
 
 		// server logger:
 		this._serverLogs = [];
+    this._consoleLogs = [];
 
 		/**
 		 * DEPRECATED: we are using our own approach.
@@ -63,7 +64,6 @@ export class Logger {
 		 *
 		 */
 	}
-
 
 	/**
 	 * Log a server message at the EXP level.
@@ -134,7 +134,7 @@ export class Logger {
 	 * @name module:core.Logger#flush
 	 * @public
 	 */
-	async flush()
+	async flush({sync = false} = {})
 	{
 		const response = {
 			origin: 'Logger.flush',
@@ -156,6 +156,13 @@ export class Logger {
 
 			formattedLogs += formattedLog;
 		}
+
+    let formattedConsoleLogs = '';
+    for (const log of this._consoleLogs) {
+      formattedConsoleLogs += log + '\n';
+    }
+    console.log(formattedConsoleLogs);
+
 
 		// send logs to the server or display them in the console:
 		if (this._psychoJS.getEnvironment() === ExperimentHandler.Environment.SERVER &&
@@ -189,34 +196,65 @@ export class Logger {
    		const experimentName = (typeof info.expName !== 'undefined') ? info.expName : this._psychoJS.config.experiment.name;
    		const datetime = ((typeof info.date !== 'undefined') ? info.date : MonotonicClock.getDateStr());
    		const filename = participant + '_' + experimentName + '_' + datetime + '.log';
+   		const console_filename = participant + '_' + experimentName + '_' + datetime + '_console.log';
       const compressed_filename = filename + '.Z';
-      if (typeof pako !== 'undefined')
- 			{
- 				try
- 				{
+      const compressed_console_filename = console_filename + '.Z';
+      if (typeof pako !== 'undefined') {
+ 				try	{
  					const utf16DeflatedLogs = pako.deflate(formattedLogs, {to: 'string'});
  					// const utf16DeflatedLogs = pako.deflate(unescape(encodeURIComponent(formattedLogs)), {to: 'string'});
  					const base64DeflatedLogs = btoa(utf16DeflatedLogs);
  					// return await this._psychoJS.serverManager.uploadLog(base64DeflatedLogs, true);
-          return await jatos.uploadResultFile(base64DeflatedLogs, compressed_filename);
 
+          const utf16DeflatedConsoleLogs = pako.deflate(formattedConsoleLogs, {to: 'string'});
+ 					// const utf16DeflatedLogs = pako.deflate(unescape(encodeURIComponent(formattedLogs)), {to: 'string'});
+ 					const base64DeflatedConsoleLogs = btoa(utf16DeflatedConsoleLogs);
+ 					// return await this._psychoJS.serverManager.uploadLog(base64DeflatedLogs, true);
+          if (sync) {
+            let jatos_url = new URL("files/" + encodeURI(compressed_filename), window.location.href).toString() + "?srid=" + jatos.studyResultId;
+            let upload_data = new FormData();
+  		      upload_data.append("file", new Blob([base64DeflatedLogs], { type: 'text/plain' }), compressed_filename);
+            navigator.sendBeacon(jatos_url, upload_data);
+            jatos_url = new URL("files/" + encodeURI(compressed_console_filename), window.location.href).toString() + "?srid=" + jatos.studyResultId;
+            upload_data = new FormData();
+  		      upload_data.append("file", new Blob([base64DeflatedConsoleLogs], { type: 'text/plain' }), compressed_console_filename);
+            navigator.sendBeacon(jatos_url, upload_data);
+          } else {
+            return await Promise.allSettled([jatos.uploadResultFile(base64DeflatedLogs, compressed_filename), jatos.uploadResultFile(base64DeflatedConsoleLogs, compressed_console_filename)]);
+          }
  				}
- 				catch (error)
- 				{
+ 				catch (error)	{
  					console.error('log compression error:', error);
  					// throw Object.assign(response, {error: error});
-          return await jatos.uploadResultFile(base64DeflatedLogs, filename);
+          if (sync) {
+            let jatos_url = new URL("files/" + encodeURI(filename), window.location.href).toString() + "?srid=" + jatos.studyResultId;
+            let upload_data = new FormData();
+  		      upload_data.append("file", new Blob([formattedLogs], { type: 'text/plain' }), filename);
+            navigator.sendBeacon(jatos_url, upload_data);
+            jatos_url = new URL("files/" + encodeURI(console_filename), window.location.href).toString() + "?srid=" + jatos.studyResultId;
+            upload_data = new FormData();
+  		      upload_data.append("file", new Blob([formattedConsoleLogs], { type: 'text/plain' }), console_filename);
+            navigator.sendBeacon(jatos_url, upload_data);
+          } else {
+            return await Promise.allSettled([jatos.uploadResultFile(formattedLogs, filename), jatos.uploadResultFile(formattedConsoleLogs, console_filename)]);
+          }
  				}
- 			}
- 			else
- 			// the pako compression library is not present, we do not compress the logs:
- 			{
- 				// return await this._psychoJS.serverManager.uploadLog(formattedLogs, false);
-        return await jatos.uploadResultFile(base64DeflatedLogs, filename);
- 			}
-    }
-		else
-		{
+ 			}	else {			// the pako compression library is not present, we do not compress the logs:
+        if (sync) {
+          let jatos_url = new URL("files/" + encodeURI(filename), window.location.href).toString() + "?srid=" + jatos.studyResultId;
+          let upload_data = new FormData();
+          upload_data.append("file", new Blob([formattedLogs], { type: 'text/plain' }), filename);
+          navigator.sendBeacon(jatos_url, upload_data);
+          jatos_url = new URL("files/" + encodeURI(console_filename), window.location.href).toString() + "?srid=" + jatos.studyResultId;
+          upload_data = new FormData();
+          upload_data.append("file", new Blob([formattedConsoleLogs], { type: 'text/plain' }), console_filename);
+          navigator.sendBeacon(jatos_url, upload_data);
+        } else {
+          return await Promise.allSettled([jatos.uploadResultFile(formattedLogs, filename), jatos.uploadResultFile(formattedConsoleLogs, console_filename)]);
+        }
+ 				// return await this._psychoJS.serverManager.uploadLog(formattedLogs, false); 			}
+      }
+    }	else {
 			this._psychoJS.logger.debug('\n' + formattedLogs);
 		}
 	}

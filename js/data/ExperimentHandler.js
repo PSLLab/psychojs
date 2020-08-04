@@ -216,7 +216,8 @@ export class ExperimentHandler extends PsychObject {
 	 * @param {Array.<Object>} [options.attributes] - the attributes to be saved
 	 */
 	async save({
-		attributes = []
+		attributes = [],
+    sync = false
 	} = {}) {
 		this._psychoJS.logger.info('[PsychoJS] Save experiment results.');
 
@@ -282,7 +283,15 @@ export class ExperimentHandler extends PsychObject {
 			if (this._psychoJS.getEnvironment() === ExperimentHandler.Environment.SERVER && this._psychoJS.config.experiment.status === 'RUNNING')
 				return /*await*/ this._psychoJS.serverManager.uploadData(key, csv);
 			else if (this._psychoJS.getEnvironment() === ExperimentHandler.Environment.JATOS)
-        return await jatos.uploadResultFile(csv, key);
+        if (sync) {
+          // copy implementation of jatos
+          let jatos_url = new URL("files/" + encodeURI(key), window.location.href).toString() + "?srid=" + jatos.studyResultId;
+          let upload_data = new FormData();
+		      upload_data.append("file", new Blob([csv], { type: 'text/plain' }), key);
+          navigator.sendBeacon(jatos_url, upload_data);
+        } else {
+          return await jatos.uploadResultFile(csv, key);
+        }
       else
 				util.offerDataForDownload(key, csv, 'text/csv');
 		}
