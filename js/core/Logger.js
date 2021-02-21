@@ -161,7 +161,7 @@ export class Logger {
     for (const log of this._consoleLogs) {
       formattedConsoleLogs += log + '\n';
     }
-    console.log(formattedConsoleLogs);
+    // console.log(formattedConsoleLogs);
 
 
 		// send logs to the server or display them in the console:
@@ -220,7 +220,11 @@ export class Logger {
   		      upload_data.append("file", new Blob([base64DeflatedConsoleLogs], { type: 'text/plain' }), compressed_console_filename);
             navigator.sendBeacon(jatos_url, upload_data);
           } else {
-            return await Promise.allSettled([jatos.uploadResultFile(base64DeflatedLogs, compressed_filename), jatos.uploadResultFile(base64DeflatedConsoleLogs, compressed_console_filename)]);
+            let promise1 = jatos.uploadResultFile(base64DeflatedLogs, compressed_filename);
+            let promise2 = jatos.uploadResultFile(base64DeflatedConsoleLogs, compressed_console_filename);
+            let result1 = await promise1;
+            let result2 = await promise2;
+            return result1;
           }
  				}
  				catch (error)	{
@@ -236,7 +240,11 @@ export class Logger {
   		      upload_data.append("file", new Blob([formattedConsoleLogs], { type: 'text/plain' }), console_filename);
             navigator.sendBeacon(jatos_url, upload_data);
           } else {
-            return await Promise.allSettled([jatos.uploadResultFile(formattedLogs, filename), jatos.uploadResultFile(formattedConsoleLogs, console_filename)]);
+            let promise1 = jatos.uploadResultFile(formattedLogs, filename);
+            let promise2 = jatos.uploadResultFile(formattedConsoleLogs, console_filename);
+            let result1 = await promise1;
+            let result2 = await promise2;
+            return result1;
           }
  				}
  			}	else {			// the pako compression library is not present, we do not compress the logs:
@@ -250,7 +258,11 @@ export class Logger {
           upload_data.append("file", new Blob([formattedConsoleLogs], { type: 'text/plain' }), console_filename);
           navigator.sendBeacon(jatos_url, upload_data);
         } else {
-          return await Promise.allSettled([jatos.uploadResultFile(formattedLogs, filename), jatos.uploadResultFile(formattedConsoleLogs, console_filename)]);
+          let promise1 = jatos.uploadResultFile(formattedLogs, filename);
+          let promise2 = jatos.uploadResultFile(formattedConsoleLogs, console_filename);
+          let result1 = await promise1;
+          let result2 = await promise2;
+          return result1;
         }
  				// return await this._psychoJS.serverManager.uploadLog(formattedLogs, false); 			}
       }

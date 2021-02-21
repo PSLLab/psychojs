@@ -414,34 +414,29 @@ export class PsychoJS
 
 			// thank participant for waiting and either quit or redirect:
 			// let text = 'Thank you for your patience.<br/><br/>';
-			let text = (typeof message !== 'undefined') ? message : 'This part is done!';
+			// let text = (typeof message !== 'undefined') ? message : 'This part is done!';
 			const self = this;
-			this._gui.dialog({
-				message: text,
-				onOK: () => {
-					// close the window:
-					self._window.close();
+      // close the window:
+      self._window.close();
 
-					// destroy dialog boxes:
-					self._gui.destroyDialog();
+      // destroy dialog boxes:
+      self._gui.destroyDialog();
 
-					// remove everything from the browser window:
-					while (document.body.hasChildNodes())
-						document.body.removeChild(document.body.lastChild);
+      // remove everything from the browser window:
+      while (document.body.hasChildNodes())
+        document.body.removeChild(document.body.lastChild);
 
-					// return from fullscreen if we were there:
-					this._window.closeFullScreen();
+      // return from fullscreen if we were there:
+      this._window.closeFullScreen();
 
-					// redirect if redirection URLs have been provided:
-          // for JATOS, we'll use the functionality built into jatos library
-          if (this.getEnvironment() !== ExperimentHandler.Environment.JATOS) {
-  					if (isCompleted && typeof self._completionUrl !== 'undefined')
-  						window.location = self._completionUrl;
-  					else if (!isCompleted && typeof self._cancellationUrl !== 'undefined')
-  						window.location = self._cancellationUrl;
-          }
-				}
-			});
+      // redirect if redirection URLs have been provided:
+      // for JATOS, we'll use the functionality built into jatos library
+      if (this.getEnvironment() !== ExperimentHandler.Environment.JATOS) {
+        if (isCompleted && typeof self._completionUrl !== 'undefined')
+          window.location = self._completionUrl;
+        else if (!isCompleted && typeof self._cancellationUrl !== 'undefined')
+          window.location = self._cancellationUrl;
+      }
 
 		}
 		catch (error) {
