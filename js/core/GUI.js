@@ -2,8 +2,9 @@
  * Graphic User Interface
  *
  * @author Alain Pitiot
- * @version 2020.1
- * @copyright (c) 2020 Ilixa Ltd. ({@link http://ilixa.com})
+ * @author Sijia Zhao - fine-grained resource loading
+ * @version 2020.2
+ * @copyright (c) 2017-2020 Ilixa Ltd. (http://ilixa.com) (c) 2020 Open Science Tools Ltd. (https://opensciencetools.org)
  * @license Distributed under the terms of the MIT License
  */
 
@@ -12,7 +13,7 @@ import {PsychoJS} from './PsychoJS';
 import {ServerManager} from './ServerManager';
 import {Scheduler} from '../util/Scheduler';
 import {Clock} from '../util/Clock';
-import { ExperimentHandler } from '../data/ExperimentHandler';
+import {ExperimentHandler} from '../data/ExperimentHandler';
 import * as util from '../util/Util';
 
 
@@ -27,14 +28,18 @@ import * as util from '../util/Util';
 export class GUI
 {
 
-	get dialogComponent() { return this._dialogComponent; }
+	get dialogComponent()
+	{
+		return this._dialogComponent;
+	}
 
 	constructor(psychoJS)
 	{
 		this._psychoJS = psychoJS;
 
 		// gui listens to RESOURCE events from the server manager:
-		psychoJS.serverManager.on(ServerManager.Event.RESOURCE, (signal) => {
+		psychoJS.serverManager.on(ServerManager.Event.RESOURCE, (signal) =>
+		{
 			this._onResourceEvents(signal);
 		});
 
@@ -66,11 +71,11 @@ export class GUI
 	 * @param {String} options.title - name of the project
 	 */
 	DlgFromDict({
-		logoUrl,
-		text,
-		dictionary,
-		title
-	})
+								logoUrl,
+								text,
+								dictionary,
+								title
+							})
 	{
 		// get info from URL:
 		const infoFromUrl = util.getUrlParameters();
@@ -79,7 +84,7 @@ export class GUI
 		this._progressBarMax = 0;
 		this._allResourcesDownloaded = false;
 		this._requiredKeys = [];
-		this._nbSetRequiredKeys = 0;
+		this._setRequiredKeys = new Map();
 
 
 		// prepare PsychoJS component:
@@ -116,7 +121,7 @@ export class GUI
 				// logo:
 				if (typeof logoUrl === 'string')
 				{
-					htmlCode += '<img id="dialog-logo" class="logo" src="' + logoUrl + '">';
+					htmlCode += '<img id="dialog-logo" class="logo" alt="logo" src="' + logoUrl + '">';
 				}
 
 				// information text:
@@ -128,17 +133,19 @@ export class GUI
 
 				// add a combobox or text areas for each entry in the dictionary:
 				htmlCode += '<form>';
-				for (const key in dictionary) {
+				for (const key in dictionary)
+				{
 					const value = dictionary[key];
-					const keyId = key + '_id';
+					const keyId = CSS.escape(key) + '_id';
 
 					// only create an input if the key is not in the URL:
 					let inUrl = false;
 					const cleanedDictKey = key.trim().toLowerCase();
-					infoFromUrl.forEach( (urlKey, urlValue) =>
+					infoFromUrl.forEach((urlValue, urlKey) =>
 					{
 						const cleanedUrlKey = urlKey.trim().toLowerCase();
-						if (cleanedUrlKey === cleanedDictKey) {
+						if (cleanedUrlKey === cleanedDictKey)
+						{
 							inUrl = true;
 							// break;
 						}
@@ -146,23 +153,30 @@ export class GUI
 
 					if (!inUrl)
 					{
-						htmlCode += '<label for="' + key + '">' + key + '</label>';
+						htmlCode += '<label for="' + keyId + '">' + key + '</label>';
 
 						// if the field is required:
 						if (key.slice(-1) === '*')
+						{
 							self._requiredKeys.push(key);
+						}
 
 						// if value is an array, we create a select drop-down menu:
-						if (Array.isArray(value)) {
+						if (Array.isArray(value))
+						{
 							htmlCode += '<select name="' + key + '" id="' + keyId + '" class="text ui-widget-content' +
 								' ui-corner-all">';
 
 							// if the field is required, we add an empty option and select it:
 							if (key.slice(-1) === '*')
+							{
 								htmlCode += '<option disabled selected>...</option>';
+							}
 
 							for (const option of value)
+							{
 								htmlCode += '<option>' + option + '</option>';
+							}
 
 							htmlCode += '</select>';
 							$('#' + keyId).selectmenu({classes: {}});
@@ -170,8 +184,10 @@ export class GUI
 
 						// otherwise we use a single string input:
 						else /*if (typeof value === 'string')*/
-							htmlCode += '<input type="text" name="' + key + '" id="' + keyId + '" value="' + value + '" class="text ui-widget-content ui-corner-all">';
-
+						{
+							htmlCode += '<input type="text" name="' + key + '" id="' + keyId;
+							htmlCode += '" value="' + value + '" class="text ui-widget-content ui-corner-all">';
+						}
 					}
 				}
 				htmlCode += '</form>';
@@ -199,17 +215,21 @@ export class GUI
 
 
 				// setup change event handlers for all required keys:
-				for (const key of this._requiredKeys) {
-					const keyId = key + '_id';
+				for (const key of this._requiredKeys)
+				{
+					const keyId = CSS.escape(key) + '_id';
 					const input = document.getElementById(keyId);
 					if (input)
-						input.onchange = (event) => GUI._onKeyChange(self, event);
+					{
+						input.oninput = (event) => GUI._onKeyChange(self, event);
+					}
 				}
 
 				// init and open the dialog box:
 				self._dialogComponent.button = 'Cancel';
 				self._estimateDialogScalingFactor();
 				const dialogSize = self._getDialogSize();
+
         if (self._psychoJS.getEnvironment() === ExperimentHandler.Environment.JATOS) {
 
     				$("#expDialog").dialog({
@@ -220,6 +240,7 @@ export class GUI
     					modal: true,
     					closeOnEscape: false,
     					resizable: false,
+    					draggable: false,
 
     					buttons: [
     						{
@@ -237,6 +258,9 @@ export class GUI
     								self._dialogComponent.button = 'OK';
     								$("#expDialog").dialog("close");
 
+                    // Tackle browser demands on having user action initiate audio context
+				            Tone.start();
+
     								// switch to full screen if requested:
     								self._psychoJS.window.adjustScreenSize();
     							}
@@ -249,6 +273,7 @@ export class GUI
     					// close is called by both buttons and when the user clicks on the cross:
     					close: function () {
     						//$.unblockUI();
+                $(this).dialog('destroy').remove();
     						self._dialogComponent.status = PsychoJS.Status.FINISHED;
     					}
 
@@ -264,33 +289,42 @@ export class GUI
   					modal: true,
   					closeOnEscape: false,
   					resizable: false,
+  					draggable: false,
 
   					buttons: [
   						{
-  							id: "buttonOk",
-  							text: "Ok",
-  							click: function () {
-
-  								// update dictionary:
-  								for (const key in dictionary) {
-  									const input = document.getElementById(key + "_id");
-  									if (input)
-  										dictionary[key] = input.value;
-  								}
-
-  								self._dialogComponent.button = 'OK';
-  								$("#expDialog").dialog("close");
-
-  								// switch to full screen if requested:
-  								self._psychoJS.window.adjustScreenSize();
+  							id: "buttonCancel",
+  							text: "Cancel",
+  							click: function ()
+  							{
+  								self._dialogComponent.button = 'Cancel';
+  								$("#expDialog").dialog('close');
   							}
   						},
   						{
-  							id: "buttonCancel",
-  							text: "Cancel",
-  							click: function () {
-  								self._dialogComponent.button = 'Cancel';
-  								$("#expDialog").dialog("close");
+  							id: "buttonOk",
+  							text: "Ok",
+  							click: function ()
+  							{
+
+  								// update dictionary:
+  								for (const key in dictionary)
+  								{
+  									const input = document.getElementById(CSS.escape(key) + "_id");
+  									if (input)
+  									{
+  										dictionary[key] = input.value;
+  									}
+  								}
+
+  								self._dialogComponent.button = 'OK';
+  								$("#expDialog").dialog('close');
+
+  								// Tackle browser demands on having user action initiate audio context
+  								Tone.start();
+
+  								// switch to full screen if requested:
+  								self._psychoJS.window.adjustScreenSize();
   							}
   						}
   					],
@@ -299,8 +333,10 @@ export class GUI
   					open: self._onDialogOpen('#expDialog'),
 
   					// close is called by both buttons and when the user clicks on the cross:
-  					close: function () {
+  					close: function ()
+  					{
   						//$.unblockUI();
+  						$(this).dialog('destroy').remove();
   						self._dialogComponent.status = PsychoJS.Status.FINISHED;
   					}
 
@@ -328,9 +364,13 @@ export class GUI
 			}
 
 			if (self._dialogComponent.status === PsychoJS.Status.FINISHED)
+			{
 				return Scheduler.Event.NEXT;
+			}
 			else
+			{
 				return Scheduler.Event.FLIP_REPEAT;
+			}
 		};
 	}
 
@@ -354,14 +394,25 @@ export class GUI
 	 * @param {GUI.onOK} [options.onOK] - function called when the participant presses the OK button
 	 */
 	dialog({
-		message,
-		warning,
-		error,
-		showOK = true,
-		onOK
-	} = {}) {
-		// destroy previous dialog box:
-		this.destroyDialog();
+					 message,
+					 warning,
+					 error,
+					 showOK = true,
+					 onOK
+				 } = {})
+	{
+
+		// close the previously opened dialog box, if there is one:
+		const expDialog = $("#expDialog");
+		if (expDialog.length)
+		{
+			expDialog.dialog("destroy").remove();
+		}
+		const msgDialog = $("#msgDialog");
+		if (msgDialog.length)
+		{
+			msgDialog.dialog("destroy").remove();
+		}
 
 		let htmlCode;
 		let titleColour;
@@ -373,13 +424,16 @@ export class GUI
 
 			// deal with null error:
 			if (!error)
+			{
 				error = 'Unspecified JavaScript error';
+			}
 
 			let errorCode = null;
 
 			// go through the error stack and look for errorCode if there is one:
 			let stackCode = '<ul>';
-			while (true) {
+			while (true)
+			{
 
 				if (typeof error === 'object' && 'errorCode' in error)
 				{
@@ -388,12 +442,18 @@ export class GUI
 
 				if (typeof error === 'object' && 'context' in error)
 				{
-						stackCode += '<li>' + error.context + '</li>';
-						error = error.error;
+					stackCode += '<li>' + error.context + '</li>';
+					error = error.error;
 				}
 				else
 				{
-					stackCode += '<li><b>' + error  + '</b></li>';
+					// limit the size of the error:
+					if (error.length >= 1000)
+					{
+						error = error.substring(1, 1000);
+					}
+
+					stackCode += '<li><b>' + error + '</b></li>';
 					break;
 				}
 			}
@@ -419,7 +479,8 @@ export class GUI
 		}
 
 		// we are displaying a message:
-		else if (typeof message !== 'undefined') {
+		else if (typeof message !== 'undefined')
+		{
 			htmlCode = '<div id="msgDialog" title="Message">' +
 				'<p class="validateTips">' + message + '</p>' +
 				'</div>';
@@ -427,7 +488,8 @@ export class GUI
 		}
 
 		// we are displaying a warning:
-		else if (typeof warning !== 'undefined') {
+		else if (typeof warning !== 'undefined')
+		{
 			htmlCode = '<div id="msgDialog" title="Warning">' +
 				'<p class="validateTips">' + warning + '</p>' +
 				'</div>';
@@ -443,7 +505,7 @@ export class GUI
 		this._estimateDialogScalingFactor();
 		const dialogSize = this._getDialogSize();
 		const self = this;
-		$('#msgDialog').dialog({
+		$("#msgDialog").dialog({
 			dialogClass: 'no-close',
 
 			width: dialogSize[0],
@@ -452,16 +514,21 @@ export class GUI
 			autoOpen: true,
 			modal: true,
 			closeOnEscape: false,
+			resizable: false,
+			draggable: false,
 
-			buttons: (!showOK)?[]:[{
+			buttons: (!showOK) ? [] : [{
 				id: "buttonOk",
 				text: "Ok",
-				click: function() {
-					$(this).dialog("close");
+				click: function ()
+				{
+					$(this).dialog("destroy").remove();
 
 					// execute callback function:
 					if (typeof onOK !== 'undefined')
+					{
 						onOK();
+					}
 				}
 			}],
 
@@ -470,7 +537,7 @@ export class GUI
 
 		})
 		// change colour of title bar
-		.prev(".ui-dialog-titlebar").css("background", titleColour);
+			.prev(".ui-dialog-titlebar").css("background", titleColour);
 
 
 		// when the browser window is resize, we redimension and reposition the dialog:
@@ -519,10 +586,12 @@ export class GUI
 	 * @param {String} dialogId - the dialog ID
 	 * @private
 	 */
-	_dialogResize(dialogId) {
+	_dialogResize(dialogId)
+	{
 		const self = this;
 
-		$(window).resize( function() {
+		$(window).resize(function ()
+		{
 			const parent = $(dialogId).parent();
 			const windowSize = [$(window).width(), $(window).height()];
 
@@ -534,7 +603,8 @@ export class GUI
 			});
 
 			const isDifferent = self._estimateDialogScalingFactor();
-			if (!isDifferent) {
+			if (!isDifferent)
+			{
 				$(dialogId).css({
 					width: dialogSize[0] - self._contentDelta[0],
 					maxHeight: dialogSize[1] - self._contentDelta[1]
@@ -547,25 +617,7 @@ export class GUI
 				left: Math.max(0, (windowSize[0] - parent.outerWidth()) / 2.0),
 				top: Math.max(0, (windowSize[1] - parent.outerHeight()) / 2.0),
 			});
-		} );
-	}
-
-
-	/**
-	 * Destroy the currently opened dialog box.
-	 *
-	 * @name module:core.GUI#dialog
-	 * @function
-	 * @public
-	 */
-	destroyDialog()
-	{
-		if ($("#expDialog").length) {
-			$("#expDialog").dialog("destroy");
-		}
-		if ($("#msgDialog").length) {
-			$("#msgDialog").dialog("destroy");
-		}
+		});
 	}
 
 
@@ -577,11 +629,13 @@ export class GUI
 	 * @private
 	 * @param {Object.<string, string|Symbol>} signal the signal
 	 */
-	_onResourceEvents(signal) {
+	_onResourceEvents(signal)
+	{
 		this._psychoJS.logger.debug('signal: ' + util.toString(signal));
 
 		// all resources have been registered:
-		if (signal.message === ServerManager.Event.RESOURCES_REGISTERED) {
+		if (signal.message === ServerManager.Event.RESOURCES_REGISTERED)
+		{
 			// for each resource, we have a 'downloading resource' and a 'resource downloaded' message:
 			this._progressBarMax = signal.count * 2;
 			$("#progressbar").progressbar("option", "max", this._progressBarMax);
@@ -591,7 +645,8 @@ export class GUI
 		}
 
 		// all the resources have been downloaded: show the ok button
-		else if (signal.message === ServerManager.Event.DOWNLOAD_COMPLETED) {
+		else if (signal.message === ServerManager.Event.DOWNLOAD_COMPLETED)
+		{
 			this._allResourcesDownloaded = true;
 			$("#progressMsg").text('all resources downloaded.');
 			this._updateOkButtonStatus();
@@ -601,21 +656,27 @@ export class GUI
 		else if (signal.message === ServerManager.Event.DOWNLOADING_RESOURCE || signal.message === ServerManager.Event.RESOURCE_DOWNLOADED)
 		{
 			if (typeof this._progressBarCurrentIncrement === 'undefined')
+			{
 				this._progressBarCurrentIncrement = 0;
-			++ this._progressBarCurrentIncrement;
+			}
+			++this._progressBarCurrentIncrement;
 
 			if (signal.message === ServerManager.Event.RESOURCE_DOWNLOADED)
-				$("#progressMsg").text('downloaded ' + this._progressBarCurrentIncrement/2 + ' / ' + this._progressBarMax/2);
+			{
+				$("#progressMsg").text('downloaded ' + this._progressBarCurrentIncrement / 2 + ' / ' + this._progressBarMax / 2);
+			}
 			// $("#progressMsg").text(signal.resource + ': downloaded.');
 			// else
-				// $("#progressMsg").text(signal.resource + ': downloading...');
+			// $("#progressMsg").text(signal.resource + ': downloading...');
 
 			$("#progressbar").progressbar("option", "value", this._progressBarCurrentIncrement);
 		}
 
 		// unknown message: we just display it
 		else
+		{
 			$("#progressMsg").text(signal.message);
+		}
 	}
 
 
@@ -623,20 +684,34 @@ export class GUI
 	 * Update the status of the OK button.
 	 *
 	 * @name module:core.GUI#_updateOkButtonStatus
+	 * @param [changeFocus = false] - whether or not to change the focus to the OK button
 	 * @function
 	 * @private
 	 */
-	_updateOkButtonStatus()
+	_updateOkButtonStatus(changeFocus = true)
 	{
-		if (this._psychoJS.getEnvironment() === ExperimentHandler.Environment.LOCAL || (this._allResourcesDownloaded && this._nbSetRequiredKeys >= this._requiredKeys.length) )
+		if (this._psychoJS.getEnvironment() === ExperimentHandler.Environment.LOCAL || (this._allResourcesDownloaded && this._setRequiredKeys && this._setRequiredKeys.size >= this._requiredKeys.length))
 		{
-			$("#buttonOk").button("option", "disabled", false);
-		} else
+			if (changeFocus)
+		{
+			$("#buttonOk").button("option", "disabled", false).focus();
+		}
+		else
+		{
+				$("#buttonOk").button("option", "disabled", false);
+			}
+		}
+		else
+		{
 			$("#buttonOk").button("option", "disabled", true);
+		}
 
 		// strangely, changing the disabled option sometimes fails to update the ui,
 		// so we need to hide it and show it again:
-		$("#buttonOk").hide(0, () => { $("#buttonOk").show(); });
+		$("#buttonOk").hide(0, () =>
+		{
+			$("#buttonOk").show();
+		});
 	}
 
 
@@ -648,20 +723,25 @@ export class GUI
 	 * @private
 	 * @returns {boolean} whether or not the scaling factor is different from the previously estimated one
 	 */
-	_estimateDialogScalingFactor() {
+	_estimateDialogScalingFactor()
+	{
 		const windowSize = [$(window).width(), $(window).height()];
 
 		// desktop:
 		let dialogScalingFactor = 1.0;
 
 		// mobile or tablet:
-		if (windowSize[0] < 1080) {
+		if (windowSize[0] < 1080)
+		{
 			// landscape:
 			if (windowSize[0] > windowSize[1])
+			{
 				dialogScalingFactor = 1.5;
-			// portrait:
+			}// portrait:
 			else
+			{
 				dialogScalingFactor = 2.0;
+			}
 		}
 
 		const isDifferent = (dialogScalingFactor !== this._dialogScalingFactor);
@@ -678,13 +758,14 @@ export class GUI
 	 * @private
 	 * @returns {number[]} the size of the popup dialog window
 	 */
-	_getDialogSize() {
+	_getDialogSize()
+	{
 		const windowSize = [$(window).width(), $(window).height()];
 		this._estimateDialogScalingFactor();
 
 		return [
-			Math.min(GUI.dialogMaxSize[0], (windowSize[0]-GUI.dialogMargin[0]) / this._dialogScalingFactor),
-			Math.min(GUI.dialogMaxSize[1], (windowSize[1]-GUI.dialogMargin[1]) / this._dialogScalingFactor)];
+			Math.min(GUI.dialogMaxSize[0], (windowSize[0] - GUI.dialogMargin[0]) / this._dialogScalingFactor),
+			Math.min(GUI.dialogMaxSize[1], (windowSize[1] - GUI.dialogMargin[1]) / this._dialogScalingFactor)];
 	}
 
 
@@ -698,16 +779,21 @@ export class GUI
 	 * @param {module:core.GUI} gui - this GUI
 	 * @param {Event} event - event
 	 */
-	static _onKeyChange(gui, event) {
+	static _onKeyChange(gui, event)
+	{
 		const element = event.target;
 		const value = element.value;
 
 		if (typeof value !== 'undefined' && value.length > 0)
-			gui._nbSetRequiredKeys++;
+		{
+			gui._setRequiredKeys.set(event.target, true);
+		}
 		else
-			gui._nbSetRequiredKeys--;
+		{
+			gui._setRequiredKeys.delete(event.target);
+		}
 
-		gui._updateOkButtonStatus();
+		gui._updateOkButtonStatus(false);
 	}
 
 
