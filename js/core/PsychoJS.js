@@ -540,7 +540,7 @@ export class PsychoJS
       self._window.close();
 
       // destroy dialog boxes:
-      self._gui.destroyDialog();
+      // self._gui.destroyDialog();
 
       // remove everything from the browser window:
       while (document.body.hasChildNodes())
