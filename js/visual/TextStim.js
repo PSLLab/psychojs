@@ -353,10 +353,10 @@ export class TextStim extends util.mix(VisualStim).with(ColorMixin)
 		switch (this._alignHoriz)
 		{
 			case 'left':
-				anchor.push(0);
+				anchor.push(0.5);
 				break;
 			case 'right':
-				anchor.push(1);
+				anchor.push(0.5);
 				break;
 			default:
 			case 'center':
