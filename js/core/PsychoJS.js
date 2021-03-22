@@ -512,13 +512,18 @@ export class PsychoJS
 				warning: 'Closing the session. Please wait a few moments.',
 				showOK: false
 			});
-			if (isCompleted || this._config.experiment.saveIncompleteResults)
-			{
-				if (!this._serverMsg.has('__noOutput'))
+			if (this.getEnvironment() === ExperimentHandler.Environment.SERVER)	{
+				if (isCompleted || this._config.experiment.saveIncompleteResults)
 				{
-					await this._experiment.save();
-					await this._logger.flush();
+					if (!this._serverMsg.has('__noOutput'))
+					{
+						await this._experiment.save();
+						await this._logger.flush();
+					}
 				}
+			} else if (this.getEnvironment() === ExperimentHandler.Environment.JATOS) {
+				await this._experiment.save();
+				await this._logger.flush();
 			}
 
 			// close the session:
