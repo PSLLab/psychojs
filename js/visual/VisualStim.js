@@ -64,7 +64,7 @@ export class VisualStim extends util.mix(MinimalStim).with(WindowMixin)
 			'opacity',
 			opacity,
 			1.0,
-			this._onChange(false, false)
+			this._onChange(true, false)
 		);
 		this._addAttribute(
 			'depth',
@@ -83,7 +83,7 @@ export class VisualStim extends util.mix(MinimalStim).with(WindowMixin)
 		// note: boundingBox does not take the orientation into account
 		this._addAttribute('boundingBox', PIXI.Rectangle.EMPTY);
 
-		
+
 		// the stimulus need to be updated:
 		this._needUpdate = true;
 
@@ -178,7 +178,7 @@ export class VisualStim extends util.mix(MinimalStim).with(WindowMixin)
 		if (hasChanged)
 		{
 			this._needUpdate = true;
-			
+
 			// update the bounding box, without calling _estimateBoundingBox:
 			this._boundingBox.x += this._pos[0] - prevPos[0];
 			this._boundingBox.y += this._pos[1] - prevPos[1];
