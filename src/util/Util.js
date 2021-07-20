@@ -933,10 +933,63 @@ export function offerDataForDownload(filename, data, type)
 }
 
 /**
+ * Adds a button to the document that if pressed calls jatos.abortStudy.
+ * By default this button is in the bottom-right corner but this and
+ * other properties can be configured.
+ *
+ * @param {object optional} config - Config object
+ * 		text: Button text
+ * 		confirm: Should the worker be asked for confirmation? Default true.
+ * 		confirmText: Confirmation text
+ * 		tooltip: Tooltip text
+ * 		msg: Message to be send back to JATOS to be logged
+ * 		style: Additional CSS styles
+ */
+ // mon_function is probably quitPsychoJS - needs to take a message and a boolean
+export function addAbortButton(config, mon_function) {
+  var buttonText = (config && typeof config.text == "string") ?
+      config.text : "Cancel";
+  var confirm = (config && typeof config.confirm == "boolean") ?
+      config.confirm : true;
+  var confirmText = (config && typeof config.confirmText == "string") ?
+      config.confirmText : "Do you really want to cancel this study?";
+  var tooltip = (config && typeof config.tooltip == "string") ?
+      config.tooltip : "Cancels this study and deletes all already submitted data";
+  var msg = (config && typeof config.msg == "string") ?
+      config.msg : "Worker decided to abort";
+  var style = 'color:black;' +
+      'background-color: red;' +
+      'font-family:Sans-Serif;' +
+      'font-size:20px;' +
+      'letter-spacing:2px;' +
+      'position:fixed;' +
+      'margin:2em 0 0 2em;' +
+      'bottom:1em;' +
+      'right:1em;' +
+      'opacity:1;' +
+      'z-index:100;' +
+      'cursor:pointer;';
+      // 'text-shadow:-1px 0 white, 0 1px white, 1px 0 white, 0 -1px white;';
+  if (config && typeof config.style == "string") style += ";" + config.style;
+
+  var text = document.createTextNode(buttonText);
+  var buttonDiv = document.createElement('div');
+  buttonDiv.appendChild(text);
+  buttonDiv.style.cssText = style;
+  buttonDiv.setAttribute("title", tooltip);
+  buttonDiv.addEventListener("click", function () {
+    if (!confirm || window.confirm(confirmText)) {
+      mon_function(msg, false);
+    }
+  });
+
+  document.body.appendChild(buttonDiv);
+}
+
+/**
  * Convert a string representing a JSON array, e.g. "[1, 2]" into an array, e.g. ["1","2"].
  * This approach overcomes the built-in JSON parsing limitations when it comes to eg. floats
  * missing the naught prefix, and is able to process several arrays, e.g. "[1,2][3,4]".
- *
  * @name module:util.turnSquareBracketsIntoArrays
  * @function
  * @public

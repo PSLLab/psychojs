@@ -123,10 +123,17 @@ export class PsychoJS
 		collectIP = false,
 		hosts = [],
 		topLevelStatus = true,
+		disableLog = false,
 	} = {})
 	{
 		// logging:
-		this._logger = new Logger(this, (debug) ? log4javascript.Level.DEBUG : log4javascript.Level.INFO);
+    let logLevel = log4javascript.Level.INFO;
+    if (debug) {
+      logLevel = log4javascript.Level.DEBUG;
+    } else if (disableLog) {
+      logLevel = log4javascript.Level.ERROR;
+    }
+		this._logger = new Logger(this, logLevel);
 		this._captureErrors();
 
 		// detect the browser:
@@ -390,7 +397,30 @@ export class PsychoJS
 						self._window.close();
 					}
 				});
-			}
+			} else if (this.getEnvironment() === ExperimentHandler.Environment.JATOS) {
+        this.beforeunloadCallback = (event) =>
+				{
+					// preventDefault should ensure that the user gets prompted:
+					event.preventDefault();
+          this._experiment.save({sync: true});
+          this._logger.flush({sync: true});
+
+					// Chrome requires returnValue to be set:
+					event.returnValue = '';
+				};
+				window.addEventListener('beforeunload', this.beforeunloadCallback);
+
+        window.addEventListener('unload', (event) =>
+				{
+          // this._experiment.save({sync: true});
+          // this._logger.flush({sync: true});
+
+					if (typeof self._window !== 'undefined')
+					{
+						self._window.close();
+					}
+				});
+      }
 
 			// start the asynchronous download of resources:
 			await this._serverManager.prepareResources(resources);
@@ -499,13 +529,18 @@ export class PsychoJS
 				warning: "Closing the session. Please wait a few moments.",
 				showOK: false,
 			});
-			if (isCompleted || this._config.experiment.saveIncompleteResults)
-			{
-				if (!this._serverMsg.has("__noOutput"))
+			if (this.getEnvironment() === ExperimentHandler.Environment.SERVER)	{
+				if (isCompleted || this._config.experiment.saveIncompleteResults)
 				{
-					await this._experiment.save();
-					await this._logger.flush();
+					if (!this._serverMsg.has('__noOutput'))
+					{
+						await this._experiment.save();
+						await this._logger.flush();
+					}
 				}
+			} else if (this.getEnvironment() === ExperimentHandler.Environment.JATOS) {
+				await this._experiment.save();
+				await this._logger.flush();
 			}
 
 			// close the session:
@@ -514,37 +549,37 @@ export class PsychoJS
 				await this._serverManager.closeSession(isCompleted);
 			}
 
+      if (this.getEnvironment() === ExperimentHandler.Environment.SERVER ||
+          this.getEnvironment() === ExperimentHandler.Environment.JATOS)	{
+				window.removeEventListener('beforeunload', this.beforeunloadCallback);
+			}
+
 			// thank participant for waiting and either quit or redirect:
-			let text = "Thank you for your patience.<br/><br/>";
-			text += (typeof message !== "undefined") ? message : "Goodbye!";
+			// let text = 'Thank you for your patience.<br/><br/>';
+			// let text = (typeof message !== 'undefined') ? message : 'This part is done!';
 			const self = this;
-			this._gui.dialog({
-				message: text,
-				onOK: () =>
-				{
-					// close the window:
-					self._window.close();
+      // close the window:
+      self._window.close();
 
-					// remove everything from the browser window:
-					while (document.body.hasChildNodes())
-					{
-						document.body.removeChild(document.body.lastChild);
-					}
+      // destroy dialog boxes:
+      // self._gui.destroyDialog();
 
-					// return from fullscreen if we were there:
-					this._window.closeFullScreen();
+      // remove everything from the browser window:
+      while (document.body.hasChildNodes())
+        document.body.removeChild(document.body.lastChild);
 
-					// redirect if redirection URLs have been provided:
-					if (isCompleted && typeof self._completionUrl !== "undefined")
-					{
-						window.location = self._completionUrl;
-					}
-					else if (!isCompleted && typeof self._cancellationUrl !== "undefined")
-					{
-						window.location = self._cancellationUrl;
-					}
-				},
-			});
+      // return from fullscreen if we were there:
+      this._window.closeFullScreen();
+
+      // redirect if redirection URLs have been provided:
+      // for JATOS, we'll use the functionality built into jatos library
+      if (this.getEnvironment() !== ExperimentHandler.Environment.JATOS) {
+        if (isCompleted && typeof self._completionUrl !== 'undefined')
+          window.location = self._completionUrl;
+        else if (!isCompleted && typeof self._cancellationUrl !== 'undefined')
+          window.location = self._cancellationUrl;
+      }
+
 		}
 		catch (error)
 		{
@@ -571,7 +606,6 @@ export class PsychoJS
 		try
 		{
 			this.status = PsychoJS.Status.CONFIGURING;
-
 			// if the experiment is running from the pavlovia.org server, we read the configuration file:
 			const experimentUrl = window.location.href;
 			// go through each url in allow list
@@ -622,7 +656,14 @@ export class PsychoJS
 				}
 
 				this._config.environment = ExperimentHandler.Environment.SERVER;
-			}
+
+			} else if ((experimentUrl.indexOf('https://experiment.psllab.org/') === 0) ||
+                 (experimentUrl.indexOf('http://127.0.0.1:9000/') === 0)) {
+        this._config = {
+					environment: ExperimentHandler.Environment.JATOS,
+					experiment: { name, saveFormat: ExperimentHandler.SaveFormat.CSV }
+				};
+      }
 			// otherwise we create an ad-hoc configuration:
 			else
 			{

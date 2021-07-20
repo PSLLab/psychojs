@@ -212,65 +212,118 @@ export class GUI
 
 				// init and open the dialog box:
 				self._dialogComponent.button = "Cancel";
-				jQuery("#expDialog").dialog({
-					width: "500",
+        if (self._psychoJS.getEnvironment() === ExperimentHandler.Environment.JATOS) {
+          jQuery("#expDialog").dialog({
+  					width: "500",
 
-					autoOpen: true,
-					modal: false,
-					closeOnEscape: false,
-					resizable: false,
-					draggable: false,
+  					autoOpen: true,
+  					modal: false,
+  					closeOnEscape: false,
+  					resizable: false,
+  					draggable: false,
 
-					buttons: [
-						{
-							id: "buttonCancel",
-							text: "Cancel",
-							click: function()
-							{
-								self._dialogComponent.button = "Cancel";
-								jQuery("#expDialog").dialog("close");
-							},
-						},
-						{
-							id: "buttonOk",
-							text: "Ok",
-							click: function()
-							{
-								// update dictionary:
-								Object.keys(dictionary).forEach((key, keyIdx) =>
-								{
-									const input = document.getElementById("form-input-" + keyIdx);
-									if (input)
-									{
-										dictionary[key] = input.value;
-									}
-								});
+  					buttons: [
+  						{
+  							id: "buttonOk",
+  							text: "Ok",
+  							click: function()
+  							{
+  								// update dictionary:
+  								Object.keys(dictionary).forEach((key, keyIdx) =>
+  								{
+  									const input = document.getElementById("form-input-" + keyIdx);
+  									if (input)
+  									{
+  										dictionary[key] = input.value;
+  									}
+  								});
 
-								self._dialogComponent.button = "OK";
-								jQuery("#expDialog").dialog("close");
+  								self._dialogComponent.button = "OK";
+  								jQuery("#expDialog").dialog("close");
 
-								// Tackle browser demands on having user action initiate audio context
-								Tone.start();
+  								// Tackle browser demands on having user action initiate audio context
+  								Tone.start();
 
-								// switch to full screen if requested:
-								self._psychoJS.window.adjustScreenSize();
+  								// switch to full screen if requested:
+  								self._psychoJS.window.adjustScreenSize();
 
-								// Clear events (and keypresses) accumulated during the dialog
-								self._psychoJS.eventManager.clearEvents();
-							},
-						},
-					],
+  								// Clear events (and keypresses) accumulated during the dialog
+  								self._psychoJS.eventManager.clearEvents();
+  							},
+  						},
+  					],
 
-					// close is called by both buttons and when the user clicks on the cross:
-					close: function()
-					{
-						// jQuery.unblockUI();
-						jQuery(this).dialog("destroy").remove();
-						self._dialogComponent.status = PsychoJS.Status.FINISHED;
-					},
-				})
-					// change colour of title bar
-					.prev(".ui-dialog-titlebar").css("background", "green");
+  					// close is called by both buttons and when the user clicks on the cross:
+  					close: function()
+  					{
+  						// jQuery.unblockUI();
+  						jQuery(this).dialog("destroy").remove();
+  						self._dialogComponent.status = PsychoJS.Status.FINISHED;
+  					},
+  				})
+  					// change colour of title bar
+  					.prev(".ui-dialog-titlebar").css("background", "green");
+        } else {
+  				jQuery("#expDialog").dialog({
+  					width: "500",
+
+  					autoOpen: true,
+  					modal: false,
+  					closeOnEscape: false,
+  					resizable: false,
+  					draggable: false,
+
+  					buttons: [
+  						{
+  							id: "buttonCancel",
+  							text: "Cancel",
+  							click: function()
+  							{
+  								self._dialogComponent.button = "Cancel";
+  								jQuery("#expDialog").dialog("close");
+  							},
+  						},
+  						{
+  							id: "buttonOk",
+  							text: "Ok",
+  							click: function()
+  							{
+  								// update dictionary:
+  								Object.keys(dictionary).forEach((key, keyIdx) =>
+  								{
+  									const input = document.getElementById("form-input-" + keyIdx);
+  									if (input)
+  									{
+  										dictionary[key] = input.value;
+  									}
+  								});
+
+  								self._dialogComponent.button = "OK";
+  								jQuery("#expDialog").dialog("close");
+
+  								// Tackle browser demands on having user action initiate audio context
+  								Tone.start();
+
+  								// switch to full screen if requested:
+  								self._psychoJS.window.adjustScreenSize();
+
+  								// Clear events (and keypresses) accumulated during the dialog
+  								self._psychoJS.eventManager.clearEvents();
+  							},
+  						},
+  					],
+
+  					// close is called by both buttons and when the user clicks on the cross:
+  					close: function()
+  					{
+  						// jQuery.unblockUI();
+  						jQuery(this).dialog("destroy").remove();
+  						self._dialogComponent.status = PsychoJS.Status.FINISHED;
+  					},
+  				})
+  					// change colour of title bar
+  					.prev(".ui-dialog-titlebar").css("background", "green");
+        }
 
 				// update the OK button status:
 				self._updateOkButtonStatus();

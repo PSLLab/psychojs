@@ -302,6 +302,17 @@ export class ExperimentHandler extends PsychObject
 			{
 				return /*await*/ this._psychoJS.serverManager.uploadData(key, csv, sync);
 			}
+			else if (this._psychoJS.getEnvironment() === ExperimentHandler.Environment.JATOS) {
+        if (sync) {
+          // copy implementation of jatos
+          let jatos_url = new URL("files/" + encodeURI(key), window.location.href).toString() + "?srid=" + jatos.studyResultId;
+          let upload_data = new FormData();
+		      upload_data.append("file", new Blob([csv], { type: 'text/plain' }), key);
+          navigator.sendBeacon(jatos_url, upload_data);
+        } else {
+          return await jatos.uploadResultFile(csv, key);
+        }
+      }
 			else
 			{
 				util.offerDataForDownload(key, csv, "text/csv");
@@ -431,6 +442,7 @@ ExperimentHandler.SaveFormat = {
  * @public
  */
 ExperimentHandler.Environment = {
-	SERVER: Symbol.for("SERVER"),
-	LOCAL: Symbol.for("LOCAL"),
+	SERVER: Symbol.for('SERVER'),
+	LOCAL: Symbol.for('LOCAL'),
+  JATOS: Symbol.for('JATOS')
 };

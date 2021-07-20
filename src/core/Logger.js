@@ -41,6 +41,7 @@ export class Logger
 
 		// server logger:
 		this._serverLogs = [];
+    this._consoleLogs = [];
 		this._serverLevel = Logger.ServerLevel.WARNING;
 		this._serverLevelValue = this._getValue(this._serverLevel);
 
@@ -129,6 +130,16 @@ export class Logger
 		if (typeof time === "undefined")
 		{
 			time = MonotonicClock.getReferenceTime();
+    }
+    // hack to disable execessive logging when desired
+    if (this.consoleLogger.getLevel() !== log4javascript.Level.ERROR) {
+  		this._serverLogs.push({
+  			msg,
+  			level,
+  			time,
+  			obj: util.toString(obj)
+  		});
+    }
 		}
 
 		/* [coming soon]
@@ -232,7 +243,7 @@ export class Logger
 	 * @name module:core.Logger#flush
 	 * @public
 	 */
-	async flush()
+	async flush({sync = false} = {})
 	{
 		const response = {
 			origin: "Logger.flush",
@@ -256,6 +267,13 @@ export class Logger
 
 			formattedLogs += formattedLog;
 		}
+
+    let formattedConsoleLogs = '';
+    for (const log of this._consoleLogs) {
+      formattedConsoleLogs += log + '\n';
+    }
+    // console.log(formattedConsoleLogs);
+
 
 		// send logs to the server or display them in the console:
 		if (
@@ -286,10 +304,84 @@ export class Logger
 			{
 				return await this._psychoJS.serverManager.uploadLog(formattedLogs, false);
 			}
-		}
-		else
-		{
-			this._psychoJS.logger.debug("\n" + formattedLogs);
+		} else if (this._psychoJS.getEnvironment() === ExperimentHandler.Environment.JATOS) {
+      const info = this._psychoJS.experiment.extraInfo;
+   		const participant = ((typeof info.participant === 'string' && info.participant.length > 0) ? info.participant : 'PARTICIPANT');
+   		const experimentName = (typeof info.expName !== 'undefined') ? info.expName : this._psychoJS.config.experiment.name;
+   		const datetime = ((typeof info.date !== 'undefined') ? info.date : MonotonicClock.getDateStr());
+   		const filename = participant + '_' + experimentName + '_' + datetime + '.log';
+   		const console_filename = participant + '_' + experimentName + '_' + datetime + '_console.log';
+      const compressed_filename = filename + '.Z';
+      const compressed_console_filename = console_filename + '.Z';
+      if (typeof pako !== 'undefined') {
+ 				try	{
+ 					const utf16DeflatedLogs = pako.deflate(formattedLogs, {to: 'string'});
+ 					// const utf16DeflatedLogs = pako.deflate(unescape(encodeURIComponent(formattedLogs)), {to: 'string'});
+ 					const base64DeflatedLogs = btoa(utf16DeflatedLogs);
+ 					// return await this._psychoJS.serverManager.uploadLog(base64DeflatedLogs, true);
+
+          const utf16DeflatedConsoleLogs = pako.deflate(formattedConsoleLogs, {to: 'string'});
+ 					// const utf16DeflatedLogs = pako.deflate(unescape(encodeURIComponent(formattedLogs)), {to: 'string'});
+ 					const base64DeflatedConsoleLogs = btoa(utf16DeflatedConsoleLogs);
+ 					// return await this._psychoJS.serverManager.uploadLog(base64DeflatedLogs, true);
+          if (sync) {
+            let jatos_url = new URL("files/" + encodeURI(compressed_filename), window.location.href).toString() + "?srid=" + jatos.studyResultId;
+            let upload_data = new FormData();
+  		      upload_data.append("file", new Blob([base64DeflatedLogs], { type: 'text/plain' }), compressed_filename);
+            navigator.sendBeacon(jatos_url, upload_data);
+            jatos_url = new URL("files/" + encodeURI(compressed_console_filename), window.location.href).toString() + "?srid=" + jatos.studyResultId;
+            upload_data = new FormData();
+  		      upload_data.append("file", new Blob([base64DeflatedConsoleLogs], { type: 'text/plain' }), compressed_console_filename);
+            navigator.sendBeacon(jatos_url, upload_data);
+          } else {
+            let promise1 = jatos.uploadResultFile(base64DeflatedLogs, compressed_filename);
+            let promise2 = jatos.uploadResultFile(base64DeflatedConsoleLogs, compressed_console_filename);
+            let result1 = await promise1;
+            let result2 = await promise2;
+            return result1;
+          }
+ 				}
+ 				catch (error)	{
+ 					console.error('log compression error:', error);
+ 					// throw Object.assign(response, {error: error});
+          if (sync) {
+            let jatos_url = new URL("files/" + encodeURI(filename), window.location.href).toString() + "?srid=" + jatos.studyResultId;
+            let upload_data = new FormData();
+  		      upload_data.append("file", new Blob([formattedLogs], { type: 'text/plain' }), filename);
+            navigator.sendBeacon(jatos_url, upload_data);
+            jatos_url = new URL("files/" + encodeURI(console_filename), window.location.href).toString() + "?srid=" + jatos.studyResultId;
+            upload_data = new FormData();
+  		      upload_data.append("file", new Blob([formattedConsoleLogs], { type: 'text/plain' }), console_filename);
+            navigator.sendBeacon(jatos_url, upload_data);
+          } else {
+            let promise1 = jatos.uploadResultFile(formattedLogs, filename);
+            let promise2 = jatos.uploadResultFile(formattedConsoleLogs, console_filename);
+            let result1 = await promise1;
+            let result2 = await promise2;
+            return result1;
+          }
+ 				}
+ 			}	else {			// the pako compression library is not present, we do not compress the logs:
+        if (sync) {
+          let jatos_url = new URL("files/" + encodeURI(filename), window.location.href).toString() + "?srid=" + jatos.studyResultId;
+          let upload_data = new FormData();
+          upload_data.append("file", new Blob([formattedLogs], { type: 'text/plain' }), filename);
+          navigator.sendBeacon(jatos_url, upload_data);
+          jatos_url = new URL("files/" + encodeURI(console_filename), window.location.href).toString() + "?srid=" + jatos.studyResultId;
+          upload_data = new FormData();
+          upload_data.append("file", new Blob([formattedConsoleLogs], { type: 'text/plain' }), console_filename);
+          navigator.sendBeacon(jatos_url, upload_data);
+        } else {
+          let promise1 = jatos.uploadResultFile(formattedLogs, filename);
+          let promise2 = jatos.uploadResultFile(formattedConsoleLogs, console_filename);
+          let result1 = await promise1;
+          let result2 = await promise2;
+          return result1;
+        }
+ 				// return await this._psychoJS.serverManager.uploadLog(formattedLogs, false); 			}
+      }
+    }	else {
+			this._psychoJS.logger.debug('\n' + formattedLogs);
 		}
 	}
 
