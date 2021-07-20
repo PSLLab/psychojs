@@ -150,14 +150,6 @@ export class Logger
 		}
 	 */
 
-		this._serverLogs.push({
-			msg,
-			level,
-			time,
-			obj: util.toString(obj),
-		});
-	}
-
 	/**
 	 * Check whether or not a log messages must be throttled.
 	 *
