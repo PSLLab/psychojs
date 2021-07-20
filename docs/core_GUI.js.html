@@ -31,12 +31,12 @@
  *
  * @author Alain Pitiot
  * @author Sijia Zhao - fine-grained resource loading
- * @version 2020.2
- * @copyright (c) 2018-2020 Ilixa Ltd. (http://ilixa.com) (c) 2020 Open Science Tools Ltd. (https://opensciencetools.org)
+ * @version 2021.2.0
+ * @copyright (c) 2017-2020 Ilixa Ltd. (http://ilixa.com) (c) 2020-2021 Open Science Tools Ltd. (https://opensciencetools.org)
  * @license Distributed under the terms of the MIT License
  */
 
-
+import * as Tone from 'tone';
 import {PsychoJS} from './PsychoJS';
 import {ServerManager} from './ServerManager';
 import {Scheduler} from '../util/Scheduler';
@@ -141,7 +141,8 @@ export class GUI
 				}
 
 				// prepare jquery UI dialog box:
-				let htmlCode = '&lt;div id="expDialog" title="' + title + '">';
+				let htmlCode =
+					'&lt;div id="expDialog" title="' + title + '">';
 
 				// uncomment for older version of the library:
 				// htmlCode += '&lt;p style="font-size: 0.8em; padding: 0.5em; margin-bottom: 0.5em; color: #FFAA00; border: 1px solid #FFAA00;">&amp;#9888; This experiment uses a deprecated version of the PsychoJS library. Consider updating to a newer version (e.g. by updating PsychoPy and re-exporting the experiment).&lt;/p>'+
@@ -160,66 +161,69 @@ export class GUI
 
 
 				// add a combobox or text areas for each entry in the dictionary:
-				htmlCode += '&lt;form>';
-				for (const key in dictionary)
-				{
-					const value = dictionary[key];
-					const keyId = CSS.escape(key) + '_id';
 
-					// only create an input if the key is not in the URL:
-					let inUrl = false;
-					const cleanedDictKey = key.trim().toLowerCase();
-					infoFromUrl.forEach((urlValue, urlKey) =>
+				// These may include Symbols as opposed to when using a for...in loop,
+				// but only strings are allowed in PsychoPy
+				Object.keys(dictionary).forEach((key, keyIdx) =>
 					{
-						const cleanedUrlKey = urlKey.trim().toLowerCase();
-						if (cleanedUrlKey === cleanedDictKey)
+						const value = dictionary[key];
+						const keyId = 'form-input-' + keyIdx;
+
+						// only create an input if the key is not in the URL:
+						let inUrl = false;
+						const cleanedDictKey = key.trim().toLowerCase();
+						infoFromUrl.forEach((urlValue, urlKey) =>
+							{
+								const cleanedUrlKey = urlKey.trim().toLowerCase();
+								if (cleanedUrlKey === cleanedDictKey)
+								{
+									inUrl = true;
+									// break;
+								}
+							});
+
+						if (!inUrl)
 						{
-							inUrl = true;
-							// break;
-						}
-					});
+							htmlCode += '&lt;label for="' + keyId + '">' + key + '&lt;/label>';
 
-					if (!inUrl)
-					{
-						htmlCode += '&lt;label for="' + keyId + '">' + key + '&lt;/label>';
-
-						// if the field is required:
-						if (key.slice(-1) === '*')
-						{
-							self._requiredKeys.push(key);
-						}
-
-						// if value is an array, we create a select drop-down menu:
-						if (Array.isArray(value))
-						{
-							htmlCode += '&lt;select name="' + key + '" id="' + keyId + '" class="text ui-widget-content' +
-								' ui-corner-all">';
-
-							// if the field is required, we add an empty option and select it:
+							// if the field is required:
 							if (key.slice(-1) === '*')
 							{
-								htmlCode += '&lt;option disabled selected>...&lt;/option>';
+								self._requiredKeys.push(keyId);
 							}
 
-							for (const option of value)
+							// if value is an array, we create a select drop-down menu:
+							if (Array.isArray(value))
 							{
-								htmlCode += '&lt;option>' + option + '&lt;/option>';
+								htmlCode += '&lt;select name="' + key + '" id="' + keyId + '" class="text ui-widget-content' +
+									' ui-corner-all">';
+
+								// if the field is required, we add an empty option and select it:
+								if (key.slice(-1) === '*')
+								{
+									htmlCode += '&lt;option disabled selected>...&lt;/option>';
+								}
+
+								for (const option of value)
+								{
+									htmlCode += '&lt;option>' + option + '&lt;/option>';
+								}
+
+								htmlCode += '&lt;/select>';
+								jQuery('#' + keyId).selectmenu({classes: {}});
 							}
 
-							htmlCode += '&lt;/select>';
-							$('#' + keyId).selectmenu({classes: {}});
-						}
-
-						// otherwise we use a single string input:
-						else /*if (typeof value === 'string')*/
-						{
-							htmlCode += '&lt;input type="text" name="' + key + '" id="' + keyId;
-							htmlCode += '" value="' + value + '" class="text ui-widget-content ui-corner-all">';
+							// otherwise we use a single string input:
+							else /*if (typeof value === 'string')*/
+							{
+								htmlCode += '&lt;input type="text" name="' + key + '" id="' + keyId;
+								htmlCode += '" value="' + value + '" class="text ui-widget-content ui-corner-all">';
+							}
 						}
 					}
-				}
-				htmlCode += '&lt;/form>';
+				);
 
+				htmlCode += '&lt;p class="validateTips">Fields marked with an asterisk (*) are required.&lt;/p>';
 
 				// add a progress bar:
 				htmlCode += '&lt;hr>&lt;div id="progressMsg" class="progress">' + self._progressMsg + '&lt;/div>';
@@ -235,7 +239,7 @@ export class GUI
 				// the dialog box:
 				if (typeof logoUrl === 'string')
 				{
-					$("#dialog-logo").on('load', () =>
+					jQuery("#dialog-logo").on('load', () =>
 					{
 						self._onDialogOpen('#expDialog')();
 					});
@@ -243,21 +247,21 @@ export class GUI
 
 
 				// setup change event handlers for all required keys:
-				for (const key of this._requiredKeys)
-				{
-					const keyId = CSS.escape(key) + '_id';
-					const input = document.getElementById(keyId);
-					if (input)
+				this._requiredKeys.forEach((keyId) =>
 					{
-						input.oninput = (event) => GUI._onKeyChange(self, event);
+						const input = document.getElementById(keyId);
+						if (input)
+						{
+							input.oninput = (event) => GUI._onKeyChange(self, event);
+						}
 					}
-				}
+				);
 
 				// init and open the dialog box:
 				self._dialogComponent.button = 'Cancel';
 				self._estimateDialogScalingFactor();
 				const dialogSize = self._getDialogSize();
-				$("#expDialog").dialog({
+				jQuery("#expDialog").dialog({
 					width: dialogSize[0],
 					maxHeight: dialogSize[1],
 
@@ -265,6 +269,7 @@ export class GUI
 					modal: true,
 					closeOnEscape: false,
 					resizable: false,
+					draggable: false,
 
 					buttons: [
 						{
@@ -273,7 +278,7 @@ export class GUI
 							click: function ()
 							{
 								self._dialogComponent.button = 'Cancel';
-								$("#expDialog").dialog('close');
+								jQuery("#expDialog").dialog('close');
 							}
 						},
 						{
@@ -283,20 +288,28 @@ export class GUI
 							{
 
 								// update dictionary:
-								for (const key in dictionary)
-								{
-									const input = document.getElementById(CSS.escape(key) + "_id");
-									if (input)
+								Object.keys(dictionary).forEach((key, keyIdx) =>
 									{
-										dictionary[key] = input.value;
+										const input = document.getElementById('form-input-' + keyIdx);
+										if (input)
+										{
+											dictionary[key] = input.value;
+										}
 									}
-								}
+								);
+
 
 								self._dialogComponent.button = 'OK';
-								$("#expDialog").dialog('close');
+								jQuery("#expDialog").dialog('close');
+
+								// Tackle browser demands on having user action initiate audio context
+								Tone.start();
 
 								// switch to full screen if requested:
 								self._psychoJS.window.adjustScreenSize();
+                
+                // Clear events (and keypresses) accumulated during the dialog
+                self._psychoJS.eventManager.clearEvents();
 							}
 						}
 					],
@@ -307,8 +320,8 @@ export class GUI
 					// close is called by both buttons and when the user clicks on the cross:
 					close: function ()
 					{
-						//$.unblockUI();
-						$(this).dialog('destroy').remove();
+						//jQuery.unblockUI();
+						jQuery(this).dialog('destroy').remove();
 						self._dialogComponent.status = PsychoJS.Status.FINISHED;
 					}
 
@@ -327,11 +340,11 @@ export class GUI
 
 				// block UI until user has pressed dialog button:
 				// note: block UI does not allow for text to be entered in the dialog form boxes, alas!
-				//$.blockUI({ message: "", baseZ: 1});
+				//jQuery.blockUI({ message: "", baseZ: 1});
 
 				// show dialog box:
-				$("#progressbar").progressbar({value: self._progressBarCurrentIncrement});
-				$("#progressbar").progressbar("option", "max", self._progressBarMax);
+				jQuery("#progressbar").progressbar({value: self._progressBarCurrentValue});
+				jQuery("#progressbar").progressbar("option", "max", self._progressBarMax);
 			}
 
 			if (self._dialogComponent.status === PsychoJS.Status.FINISHED)
@@ -374,12 +387,12 @@ export class GUI
 	{
 
 		// close the previously opened dialog box, if there is one:
-		const expDialog = $("#expDialog");
+		const expDialog = jQuery("#expDialog");
 		if (expDialog.length)
 		{
 			expDialog.dialog("destroy").remove();
 		}
-		const msgDialog = $("#msgDialog");
+		const msgDialog = jQuery("#msgDialog");
 		if (msgDialog.length)
 		{
 			msgDialog.dialog("destroy").remove();
@@ -418,6 +431,12 @@ export class GUI
 				}
 				else
 				{
+					// limit the size of the error:
+					if (error.length >= 1000)
+					{
+						error = error.substring(1, 1000);
+					}
+
 					stackCode += '&lt;li>&lt;b>' + error + '&lt;/b>&lt;/li>';
 					break;
 				}
@@ -470,7 +489,7 @@ export class GUI
 		this._estimateDialogScalingFactor();
 		const dialogSize = this._getDialogSize();
 		const self = this;
-		$("#msgDialog").dialog({
+		jQuery("#msgDialog").dialog({
 			dialogClass: 'no-close',
 
 			width: dialogSize[0],
@@ -479,13 +498,15 @@ export class GUI
 			autoOpen: true,
 			modal: true,
 			closeOnEscape: false,
+			resizable: false,
+			draggable: false,
 
 			buttons: (!showOK) ? [] : [{
 				id: "buttonOk",
 				text: "Ok",
 				click: function ()
 				{
-					$(this).dialog("destroy").remove();
+					jQuery(this).dialog("destroy").remove();
 
 					// execute callback function:
 					if (typeof onOK !== 'undefined')
@@ -523,10 +544,10 @@ export class GUI
 
 		return () =>
 		{
-			const windowSize = [$(window).width(), $(window).height()];
+			const windowSize = [jQuery(window).width(), jQuery(window).height()];
 
-			// note: $(dialogId) is the dialog-content, $(dialogId).parent() is the actual widget
-			const parent = $(dialogId).parent();
+			// note: jQuery(dialogId) is the dialog-content, jQuery(dialogId).parent() is the actual widget
+			const parent = jQuery(dialogId).parent();
 			parent.css({
 				position: 'absolute',
 				left: Math.max(0, (windowSize[0] - parent.outerWidth()) / 2.0),
@@ -535,8 +556,8 @@ export class GUI
 
 			// record width and height difference between dialog content and dialog:
 			self._contentDelta = [
-				parent.css('width').slice(0, -2) - $(dialogId).css('width').slice(0, -2),
-				parent.css('height').slice(0, -2) - $(dialogId).css('height').slice(0, -2)];
+				parent.css('width').slice(0, -2) - jQuery(dialogId).css('width').slice(0, -2),
+				parent.css('height').slice(0, -2) - jQuery(dialogId).css('height').slice(0, -2)];
 		};
 	}
 
@@ -553,10 +574,10 @@ export class GUI
 	{
 		const self = this;
 
-		$(window).resize(function ()
+		jQuery(window).resize(function ()
 		{
-			const parent = $(dialogId).parent();
-			const windowSize = [$(window).width(), $(window).height()];
+			const parent = jQuery(dialogId).parent();
+			const windowSize = [jQuery(window).width(), jQuery(window).height()];
 
 			// size (we need to redimension both the dialog and the dialog content):
 			const dialogSize = self._getDialogSize();
@@ -568,7 +589,7 @@ export class GUI
 			const isDifferent = self._estimateDialogScalingFactor();
 			if (!isDifferent)
 			{
-				$(dialogId).css({
+				jQuery(dialogId).css({
 					width: dialogSize[0] - self._contentDelta[0],
 					maxHeight: dialogSize[1] - self._contentDelta[1]
 				});
@@ -596,49 +617,50 @@ export class GUI
 	{
 		this._psychoJS.logger.debug('signal: ' + util.toString(signal));
 
-		// all resources have been registered:
-		if (signal.message === ServerManager.Event.RESOURCES_REGISTERED)
+		// the download of the specified resources has started:
+		if (signal.message === ServerManager.Event.DOWNLOADING_RESOURCES)
 		{
 			// for each resource, we have a 'downloading resource' and a 'resource downloaded' message:
 			this._progressBarMax = signal.count * 2;
-			$("#progressbar").progressbar("option", "max", this._progressBarMax);
+			jQuery("#progressbar").progressbar("option", "max", this._progressBarMax);
 
-			this._progressBarCurrentIncrement = 0;
-			$("#progressMsg").text('all resources registered.');
+			this._progressBarCurrentValue = 0;
 		}
 
 		// all the resources have been downloaded: show the ok button
 		else if (signal.message === ServerManager.Event.DOWNLOAD_COMPLETED)
 		{
 			this._allResourcesDownloaded = true;
-			$("#progressMsg").text('all resources downloaded.');
+			jQuery("#progressMsg").text('all resources downloaded.');
 			this._updateOkButtonStatus();
 		}
 
 		// update progress bar:
-		else if (signal.message === ServerManager.Event.DOWNLOADING_RESOURCE || signal.message === ServerManager.Event.RESOURCE_DOWNLOADED)
+		else if (signal.message === ServerManager.Event.DOWNLOADING_RESOURCE
+			|| signal.message === ServerManager.Event.RESOURCE_DOWNLOADED)
 		{
-			if (typeof this._progressBarCurrentIncrement === 'undefined')
+			if (typeof this._progressBarCurrentValue === 'undefined')
 			{
-				this._progressBarCurrentIncrement = 0;
+				this._progressBarCurrentValue = 0;
 			}
-			++this._progressBarCurrentIncrement;
+			++this._progressBarCurrentValue;
 
 			if (signal.message === ServerManager.Event.RESOURCE_DOWNLOADED)
 			{
-				$("#progressMsg").text('downloaded ' + this._progressBarCurrentIncrement / 2 + ' / ' + this._progressBarMax / 2);
+				jQuery("#progressMsg").text('downloaded ' + (this._progressBarCurrentValue / 2) + ' / ' + (this._progressBarMax / 2));
+			}
+			else
+			{
+				jQuery("#progressMsg").text('downloading ' + (this._progressBarCurrentValue / 2) + ' / ' + (this._progressBarMax / 2));
 			}
 			// $("#progressMsg").text(signal.resource + ': downloaded.');
-			// else
-			// $("#progressMsg").text(signal.resource + ': downloading...');
-
-			$("#progressbar").progressbar("option", "value", this._progressBarCurrentIncrement);
+			jQuery("#progressbar").progressbar("option", "value", this._progressBarCurrentValue);
 		}
 
 		// unknown message: we just display it
 		else
 		{
-			$("#progressMsg").text(signal.message);
+			jQuery("#progressMsg").text(signal.message);
 		}
 	}
 
@@ -647,25 +669,33 @@ export class GUI
 	 * Update the status of the OK button.
 	 *
 	 * @name module:core.GUI#_updateOkButtonStatus
+	 * @param [changeFocus = false] - whether or not to change the focus to the OK button
 	 * @function
 	 * @private
 	 */
-	_updateOkButtonStatus()
+	_updateOkButtonStatus(changeFocus = true)
 	{
-		if (this._psychoJS.getEnvironment() === ExperimentHandler.Environment.LOCAL || (this._allResourcesDownloaded &amp;&amp; this._setRequiredKeys.size >= this._requiredKeys.length))
+		if (this._psychoJS.getEnvironment() === ExperimentHandler.Environment.LOCAL || (this._allResourcesDownloaded &amp;&amp; this._setRequiredKeys &amp;&amp; this._setRequiredKeys.size >= this._requiredKeys.length))
 		{
-			$("#buttonOk").button("option", "disabled", false);
+			if (changeFocus)
+		{
+			jQuery("#buttonOk").button("option", "disabled", false).focus();
 		}
 		else
 		{
-			$("#buttonOk").button("option", "disabled", true);
+				jQuery("#buttonOk").button("option", "disabled", false);
+			}
+		}
+		else
+		{
+			jQuery("#buttonOk").button("option", "disabled", true);
 		}
 
 		// strangely, changing the disabled option sometimes fails to update the ui,
 		// so we need to hide it and show it again:
-		$("#buttonOk").hide(0, () =>
+		jQuery("#buttonOk").hide(0, () =>
 		{
-			$("#buttonOk").show();
+			jQuery("#buttonOk").show();
 		});
 	}
 
@@ -680,7 +710,7 @@ export class GUI
 	 */
 	_estimateDialogScalingFactor()
 	{
-		const windowSize = [$(window).width(), $(window).height()];
+		const windowSize = [jQuery(window).width(), jQuery(window).height()];
 
 		// desktop:
 		let dialogScalingFactor = 1.0;
@@ -715,7 +745,7 @@ export class GUI
 	 */
 	_getDialogSize()
 	{
-		const windowSize = [$(window).width(), $(window).height()];
+		const windowSize = [jQuery(window).width(), jQuery(window).height()];
 		this._estimateDialogScalingFactor();
 
 		return [
@@ -748,7 +778,7 @@ export class GUI
 			gui._setRequiredKeys.delete(event.target);
 		}
 
-		gui._updateOkButtonStatus();
+		gui._updateOkButtonStatus(false);
 	}
 
 
@@ -881,13 +911,13 @@ GUI.dialogMargin = [50, 50];
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-core.html">core</a></li><li><a href="module-data.html">data</a></li><li><a href="module-sound.html">sound</a></li><li><a href="module-util.html">util</a></li><li><a href="module-visual.html">visual</a></li></ul><h3>Classes</h3><ul><li><a href="module-core.BuilderKeyResponse.html">BuilderKeyResponse</a></li><li><a href="module-core.EventManager.html">EventManager</a></li><li><a href="module-core.GUI.html">GUI</a></li><li><a href="module-core.Keyboard.html">Keyboard</a></li><li><a href="module-core.KeyPress.html">KeyPress</a></li><li><a href="module-core.Logger.html">Logger</a></li><li><a href="module-core.MinimalStim.html">MinimalStim</a></li><li><a href="module-core.Mouse.html">Mouse</a></li><li><a href="module-core.PsychoJS.html">PsychoJS</a></li><li><a href="module-core.ServerManager.html">ServerManager</a></li><li><a href="module-core.Window.html">Window</a></li><li><a href="module-data.ExperimentHandler.html">ExperimentHandler</a></li><li><a href="module-data.TrialHandler.html">TrialHandler</a></li><li><a href="module-sound.Sound.html">Sound</a></li><li><a href="module-sound.TonePlayer.html">TonePlayer</a></li><li><a href="module-sound.TrackPlayer.html">TrackPlayer</a></li><li><a href="module-util.Clock.html">Clock</a></li><li><a href="module-util.Color.html">Color</a></li><li><a href="module-util.CountdownTimer.html">CountdownTimer</a></li><li><a href="module-util.EventEmitter.html">EventEmitter</a></li><li><a href="module-util.MixinBuilder.html">MixinBuilder</a></li><li><a href="module-util.MonotonicClock.html">MonotonicClock</a></li><li><a href="module-util.PsychObject.html">PsychObject</a></li><li><a href="module-util.Scheduler.html">Scheduler</a></li><li><a href="module-visual.Form.html">Form</a></li><li><a href="module-visual.ImageStim.html">ImageStim</a></li><li><a href="module-visual.MovieStim.html">MovieStim</a></li><li><a href="module-visual.Polygon.html">Polygon</a></li><li><a href="module-visual.Rect.html">Rect</a></li><li><a href="module-visual.ShapeStim.html">ShapeStim</a></li><li><a href="module-visual.Slider.html">Slider</a></li><li><a href="module-visual.TextBox.html">TextBox</a></li><li><a href="module-visual.TextStim.html">TextStim</a></li><li><a href="module-visual.VisualStim.html">VisualStim</a></li><li><a href="TextInput.html">TextInput</a></li></ul><h3>Interfaces</h3><ul><li><a href="module-sound.SoundPlayer.html">SoundPlayer</a></li></ul><h3>Mixins</h3><ul><li><a href="module-core.WindowMixin.html">WindowMixin</a></li><li><a href="module-util.ColorMixin.html">ColorMixin</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-core.html">core</a></li><li><a href="module-data.html">data</a></li><li><a href="module-sound.html">sound</a></li><li><a href="module-util.html">util</a></li><li><a href="module-visual.html">visual</a></li></ul><h3>Classes</h3><ul><li><a href="module-core.BuilderKeyResponse.html">BuilderKeyResponse</a></li><li><a href="module-core.EventManager.html">EventManager</a></li><li><a href="module-core.GUI.html">GUI</a></li><li><a href="module-core.Keyboard.html">Keyboard</a></li><li><a href="module-core.KeyPress.html">KeyPress</a></li><li><a href="module-core.Logger.html">Logger</a></li><li><a href="module-core.MinimalStim.html">MinimalStim</a></li><li><a href="module-core.Mouse.html">Mouse</a></li><li><a href="module-core.PsychoJS.html">PsychoJS</a></li><li><a href="module-core.ServerManager.html">ServerManager</a></li><li><a href="module-core.Window.html">Window</a></li><li><a href="module-data.ExperimentHandler.html">ExperimentHandler</a></li><li><a href="module-data.TrialHandler.html">TrialHandler</a></li><li><a href="module-sound.AudioClip.html">AudioClip</a></li><li><a href="module-sound.AudioClipPlayer.html">AudioClipPlayer</a></li><li><a href="module-sound.Microphone.html">Microphone</a></li><li><a href="module-sound.Sound.html">Sound</a></li><li><a href="module-sound.TonePlayer.html">TonePlayer</a></li><li><a href="module-sound.TrackPlayer.html">TrackPlayer</a></li><li><a href="module-util.Clock.html">Clock</a></li><li><a href="module-util.Color.html">Color</a></li><li><a href="module-util.CountdownTimer.html">CountdownTimer</a></li><li><a href="module-util.EventEmitter.html">EventEmitter</a></li><li><a href="module-util.MixinBuilder.html">MixinBuilder</a></li><li><a href="module-util.MonotonicClock.html">MonotonicClock</a></li><li><a href="module-util.PsychObject.html">PsychObject</a></li><li><a href="module-util.Scheduler.html">Scheduler</a></li><li><a href="module-visual.ButtonStim.html">ButtonStim</a></li><li><a href="module-visual.Form.html">Form</a></li><li><a href="module-visual.ImageStim.html">ImageStim</a></li><li><a href="module-visual.MovieStim.html">MovieStim</a></li><li><a href="module-visual.Polygon.html">Polygon</a></li><li><a href="module-visual.Rect.html">Rect</a></li><li><a href="module-visual.ShapeStim.html">ShapeStim</a></li><li><a href="module-visual.Slider.html">Slider</a></li><li><a href="module-visual.TextBox.html">TextBox</a></li><li><a href="module-visual.TextStim.html">TextStim</a></li><li><a href="module-visual.VisualStim.html">VisualStim</a></li></ul><h3>Interfaces</h3><ul><li><a href="module-sound.SoundPlayer.html">SoundPlayer</a></li></ul><h3>Mixins</h3><ul><li><a href="module-core.WindowMixin.html">WindowMixin</a></li><li><a href="module-util.ColorMixin.html">ColorMixin</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.3</a> on Thu Aug 20 2020 12:03:43 GMT+0200 (Central European Summer Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.7</a> on Mon Jun 21 2021 07:34:20 GMT+0200 (Central European Summer Time)
 </footer>
 
 <script> prettyPrint(); </script>

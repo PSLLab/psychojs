@@ -32,15 +32,16 @@
  *
  * @author Alain Pitiot
  * @author Hiroyuki Sogo &amp; Sotiri Bakagiannis  - better support for BOM and accented characters
- * @version 2020.2
- * @copyright (c) 2018-2020 Ilixa Ltd. (http://ilixa.com) (c) 2020 Open Science Tools Ltd. (https://opensciencetools.org)
+ * @version 2021.2.0
+ * @copyright (c) 2017-2020 Ilixa Ltd. (http://ilixa.com) (c) 2020-2021 Open Science Tools Ltd. (https://opensciencetools.org)
  * @license Distributed under the terms of the MIT License
  */
 
 
+import seedrandom from 'seedrandom';
+import * as XLSX from 'xlsx';
 import {PsychObject} from '../util/PsychObject';
 import * as util from '../util/Util';
-
 
 /**
  * &lt;p>A Trial Handler handles the importing and sequencing of conditions.&lt;/p>
@@ -103,10 +104,15 @@ export class TrialHandler extends PsychObject
 	{
 		super(psychoJS);
 
-		this._addAttributes(TrialHandler, trialList, nReps, method, extraInfo, seed, name, autoLog);
-
+		this._addAttribute('trialList', trialList);
+		this._addAttribute('nReps', nReps);
+		this._addAttribute('method', method);
+		this._addAttribute('extraInfo', extraInfo);
+		this._addAttribute('name', name);
+		this._addAttribute('autoLog', autoLog);
+		this._addAttribute('seed', seed);
 		this._prepareTrialList(trialList);
-
+		
 		// number of stimuli
 		this.nStim = this.trialList.length;
 
@@ -141,6 +147,17 @@ export class TrialHandler extends PsychObject
 		this._experimentHandler = null;
 		this.thisTrial = null;
 		this._finished = false;
+	}
+
+
+	/**
+	 * Helps go through each trial in the sequence one by one, mirrors PsychoPy.
+	 */
+	next() {
+		const trialIterator = this[Symbol.iterator]();
+		const { value } = trialIterator.next();
+
+		return value;
 	}
 
 
@@ -222,6 +239,7 @@ export class TrialHandler extends PsychObject
 
 	/**
 	 * @typedef {Object} Snapshot
+	 * @property {TrialHandler} handler - the trialHandler
 	 * @property {string} name - the trialHandler name
 	 * @property {number} nStim - the number of stimuli
 	 * @property {number} nTotal - the total number of trials that will be run
@@ -232,8 +250,8 @@ export class TrialHandler extends PsychObject
 	 * @property {number} thisIndex - the index of the current trial in the conditions list
 	 * @property {number} ran - whether or not the trial ran
 	 * @property {number} finished - whether or not the trials finished
+	 * @property {Object} trialAttributes - a list of trial attributes
 	 */
-
 	/**
 	 * Get a snapshot of the current internal state of the trial handler (e.g. current trial number,
 	 * number of trial remaining).
@@ -248,6 +266,7 @@ export class TrialHandler extends PsychObject
 		const currentIndex = this.thisIndex;
 
 		const snapshot = {
+			handler: this,
 			name: this.name,
 			nStim: this.nStim,
 			nTotal: this.nTotal,
@@ -261,11 +280,99 @@ export class TrialHandler extends PsychObject
 
 			getCurrentTrial: () => this.getTrial(currentIndex),
 			getTrial: (index = 0) => this.getTrial(index),
+
+			addData: (key, value) => this.addData(key, value)
 		};
 
+		// add to the snapshots the current trial's attributes:
+		const currentTrial = this.getCurrentTrial();
+		const excludedAttributes = ['handler', 'name', 'nStim', 'nRemaining', 'thisRepN', 'thisTrialN', 'thisN', 'thisIndex', 'ran', 'finished'];
+		const trialAttributes = [];
+		for (const attribute in currentTrial)
+		{
+			if (!(attribute in excludedAttributes))
+			{
+				snapshot[attribute] = currentTrial[attribute];
+				trialAttributes.push(attribute);
+			}
+			else
+			{
+				this._psychoJS.logger.warn(`attempt to replace the value of protected TrialHandler variable: ${attribute}`);
+			}
+			snapshot.trialAttributes = trialAttributes;
+		}
+
+		// add the snapshot to the list:
 		this._snapshots.push(snapshot);
 
 		return snapshot;
+	}
+
+
+	/**
+	 * Setter for the seed attribute.
+	 *
+	 * @param {boolean} seed - the seed value
+	 * @param {boolean} log - whether or not to log the change of seed
+	 */
+	setSeed(seed, log)
+	{
+		this._setAttribute('seed', seed, log);
+
+		if (typeof seed !== 'undefined')
+		{
+			this._randomNumberGenerator = seedrandom(seed);
+		}
+		else
+		{
+			this._randomNumberGenerator = seedrandom();
+		}
+	}
+
+
+	/**
+	 * Set the internal state of this trial handler from the given snapshot.
+	 *
+	 * @public
+	 * @static
+	 * @param {Snapshot} snapshot - the snapshot from which to update the current internal state.
+	 */
+	static fromSnapshot(snapshot)
+	{
+		// if snapshot is undefined, do nothing:
+		if (typeof snapshot === 'undefined')
+		{
+			return;
+		}
+
+		snapshot.handler.nStim = snapshot.nStim;
+		snapshot.handler.nTotal = snapshot.nTotal;
+		snapshot.handler.nRemaining = snapshot.nRemaining;
+		snapshot.handler.thisRepN = snapshot.thisRepN;
+		snapshot.handler.thisTrialN = snapshot.thisTrialN;
+		snapshot.handler.thisN = snapshot.thisN;
+		snapshot.handler.thisIndex = snapshot.thisIndex;
+		snapshot.handler.ran = snapshot.ran;
+		snapshot.handler._finished = snapshot._finished;
+
+		snapshot.handler.thisTrial = snapshot.handler.getCurrentTrial();
+
+		// add to the trial handler the snapshot's trial attributes:
+		for (const attribute of snapshot.trialAttributes)
+		{
+			snapshot.handler[attribute] = snapshot[attribute];
+		}
+	}
+
+
+	/**
+	 * Getter for the finished attribute.
+	 *
+	 * @returns {boolean} whether or not the trial has finished.
+	 */
+	get finished()
+	{
+		return this._finished;
 	}
 
 
@@ -455,7 +562,7 @@ export class TrialHandler extends PsychObject
 			if (['csv', 'odp', 'xls', 'xlsx'].indexOf(resourceExtension) > -1)
 			{
 				// (*) read conditions from resource:
-				const resourceValue = serverManager.getResource(resourceName);
+				const resourceValue = serverManager.getResource(resourceName, true);
 
 				// Conditionally use a `TextDecoder` to reprocess .csv type input,
 				// which is then read in as a string
@@ -495,10 +602,32 @@ export class TrialHandler extends PsychObject
 					{
 						let value = row[l];
 
-						// if value is a numerical string, convert it to a number:
-						if (typeof value === 'string' &amp;&amp; !isNaN(value))
+						// Look for string encoded arrays in the form of '[1, 2]'
+						const arrayMaybe = util.turnSquareBracketsIntoArrays(value);
+
+						if (Array.isArray(arrayMaybe))
 						{
-							value = Number.parseFloat(value);
+							// Keep the first match if more than one are found. If the
+							// input string looked like '[1, 2][3, 4]' for example,
+							// the resulting `value` would be [1, 2]. When `arrayMaybe` is
+							// empty, `value` turns `undefined`.
+							value = arrayMaybe;
+						}
+
+						if (typeof value === 'string')
+						{
+							const numberMaybe = Number.parseFloat(value);
+
+							// if value is a numerical string, convert it to a number:
+							if (!isNaN(numberMaybe) &amp;&amp; numberMaybe.toString().length === value.length)
+							{
+								value = numberMaybe;
+							}
+							else
+							{
+								// Parse doubly escaped line feeds
+								value = value.replace(/(\n)/g, '\n');
+							}
 						}
 
 						trial[fields[l]] = value;
@@ -605,16 +734,6 @@ export class TrialHandler extends PsychObject
 		// get an array of the indices of the elements of trialList :
 		const indices = Array.from(this.trialList.keys());
 
-		// seed the random number generator:
-		if (typeof (this.seed) !== 'undefined')
-		{
-			Math.seedrandom(this.seed);
-		}
-		else
-		{
-			Math.seedrandom();
-		}
-
 		if (this.method === TrialHandler.Method.SEQUENTIAL)
 		{
 			this._trialSequence = Array(this.nReps).fill(indices);
@@ -627,7 +746,7 @@ export class TrialHandler extends PsychObject
 			this._trialSequence = [];
 			for (let i = 0; i &lt; this.nReps; ++i)
 			{
-				this._trialSequence.push(util.shuffle(indices.slice()));
+				this._trialSequence.push(util.shuffle(indices.slice(), this._randomNumberGenerator));
 			}
 		}
 
@@ -641,7 +760,7 @@ export class TrialHandler extends PsychObject
 			}
 
 			// shuffle the sequence:
-			util.shuffle(flatSequence);
+			util.shuffle(flatSequence, this._randomNumberGenerator);
 
 			// reshape it into the trialSequence:
 			this._trialSequence = [];
@@ -682,7 +801,12 @@ TrialHandler.Method = {
 	/**
 	 * Conditions are fully randomised across all repeats.
 	 */
-	FULL_RANDOM: Symbol.for('FULL_RANDOM')
+	FULL_RANDOM: Symbol.for('FULL_RANDOM'),
+
+	/**
+	 * Same as above, but named to reflect PsychoPy boileplate.
+	 */
+	FULLRANDOM: Symbol.for('FULL_RANDOM')
 };
 </code></pre>
         </article>
@@ -694,13 +818,13 @@ TrialHandler.Method = {
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-core.html">core</a></li><li><a href="module-data.html">data</a></li><li><a href="module-sound.html">sound</a></li><li><a href="module-util.html">util</a></li><li><a href="module-visual.html">visual</a></li></ul><h3>Classes</h3><ul><li><a href="module-core.BuilderKeyResponse.html">BuilderKeyResponse</a></li><li><a href="module-core.EventManager.html">EventManager</a></li><li><a href="module-core.GUI.html">GUI</a></li><li><a href="module-core.Keyboard.html">Keyboard</a></li><li><a href="module-core.KeyPress.html">KeyPress</a></li><li><a href="module-core.Logger.html">Logger</a></li><li><a href="module-core.MinimalStim.html">MinimalStim</a></li><li><a href="module-core.Mouse.html">Mouse</a></li><li><a href="module-core.PsychoJS.html">PsychoJS</a></li><li><a href="module-core.ServerManager.html">ServerManager</a></li><li><a href="module-core.Window.html">Window</a></li><li><a href="module-data.ExperimentHandler.html">ExperimentHandler</a></li><li><a href="module-data.TrialHandler.html">TrialHandler</a></li><li><a href="module-sound.Sound.html">Sound</a></li><li><a href="module-sound.TonePlayer.html">TonePlayer</a></li><li><a href="module-sound.TrackPlayer.html">TrackPlayer</a></li><li><a href="module-util.Clock.html">Clock</a></li><li><a href="module-util.Color.html">Color</a></li><li><a href="module-util.CountdownTimer.html">CountdownTimer</a></li><li><a href="module-util.EventEmitter.html">EventEmitter</a></li><li><a href="module-util.MixinBuilder.html">MixinBuilder</a></li><li><a href="module-util.MonotonicClock.html">MonotonicClock</a></li><li><a href="module-util.PsychObject.html">PsychObject</a></li><li><a href="module-util.Scheduler.html">Scheduler</a></li><li><a href="module-visual.Form.html">Form</a></li><li><a href="module-visual.ImageStim.html">ImageStim</a></li><li><a href="module-visual.MovieStim.html">MovieStim</a></li><li><a href="module-visual.Polygon.html">Polygon</a></li><li><a href="module-visual.Rect.html">Rect</a></li><li><a href="module-visual.ShapeStim.html">ShapeStim</a></li><li><a href="module-visual.Slider.html">Slider</a></li><li><a href="module-visual.TextBox.html">TextBox</a></li><li><a href="module-visual.TextStim.html">TextStim</a></li><li><a href="module-visual.VisualStim.html">VisualStim</a></li><li><a href="TextInput.html">TextInput</a></li></ul><h3>Interfaces</h3><ul><li><a href="module-sound.SoundPlayer.html">SoundPlayer</a></li></ul><h3>Mixins</h3><ul><li><a href="module-core.WindowMixin.html">WindowMixin</a></li><li><a href="module-util.ColorMixin.html">ColorMixin</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-core.html">core</a></li><li><a href="module-data.html">data</a></li><li><a href="module-sound.html">sound</a></li><li><a href="module-util.html">util</a></li><li><a href="module-visual.html">visual</a></li></ul><h3>Classes</h3><ul><li><a href="module-core.BuilderKeyResponse.html">BuilderKeyResponse</a></li><li><a href="module-core.EventManager.html">EventManager</a></li><li><a href="module-core.GUI.html">GUI</a></li><li><a href="module-core.Keyboard.html">Keyboard</a></li><li><a href="module-core.KeyPress.html">KeyPress</a></li><li><a href="module-core.Logger.html">Logger</a></li><li><a href="module-core.MinimalStim.html">MinimalStim</a></li><li><a href="module-core.Mouse.html">Mouse</a></li><li><a href="module-core.PsychoJS.html">PsychoJS</a></li><li><a href="module-core.ServerManager.html">ServerManager</a></li><li><a href="module-core.Window.html">Window</a></li><li><a href="module-data.ExperimentHandler.html">ExperimentHandler</a></li><li><a href="module-data.TrialHandler.html">TrialHandler</a></li><li><a href="module-sound.AudioClip.html">AudioClip</a></li><li><a href="module-sound.AudioClipPlayer.html">AudioClipPlayer</a></li><li><a href="module-sound.Microphone.html">Microphone</a></li><li><a href="module-sound.Sound.html">Sound</a></li><li><a href="module-sound.TonePlayer.html">TonePlayer</a></li><li><a href="module-sound.TrackPlayer.html">TrackPlayer</a></li><li><a href="module-util.Clock.html">Clock</a></li><li><a href="module-util.Color.html">Color</a></li><li><a href="module-util.CountdownTimer.html">CountdownTimer</a></li><li><a href="module-util.EventEmitter.html">EventEmitter</a></li><li><a href="module-util.MixinBuilder.html">MixinBuilder</a></li><li><a href="module-util.MonotonicClock.html">MonotonicClock</a></li><li><a href="module-util.PsychObject.html">PsychObject</a></li><li><a href="module-util.Scheduler.html">Scheduler</a></li><li><a href="module-visual.ButtonStim.html">ButtonStim</a></li><li><a href="module-visual.Form.html">Form</a></li><li><a href="module-visual.ImageStim.html">ImageStim</a></li><li><a href="module-visual.MovieStim.html">MovieStim</a></li><li><a href="module-visual.Polygon.html">Polygon</a></li><li><a href="module-visual.Rect.html">Rect</a></li><li><a href="module-visual.ShapeStim.html">ShapeStim</a></li><li><a href="module-visual.Slider.html">Slider</a></li><li><a href="module-visual.TextBox.html">TextBox</a></li><li><a href="module-visual.TextStim.html">TextStim</a></li><li><a href="module-visual.VisualStim.html">VisualStim</a></li></ul><h3>Interfaces</h3><ul><li><a href="module-sound.SoundPlayer.html">SoundPlayer</a></li></ul><h3>Mixins</h3><ul><li><a href="module-core.WindowMixin.html">WindowMixin</a></li><li><a href="module-util.ColorMixin.html">ColorMixin</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.3</a> on Thu Aug 20 2020 12:03:43 GMT+0200 (Central European Summer Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.7</a> on Mon Jun 21 2021 07:34:20 GMT+0200 (Central European Summer Time)
 </footer>
 
 <script> prettyPrint(); </script>
