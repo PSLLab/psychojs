@@ -190,7 +190,7 @@ export class GUI
 					}
 				});
 
-				htmlCode += '<p class="validateTips">Fields marked with an asterisk (*) are required.</p>';
+				// htmlCode += '<p class="validateTips">Fields marked with an asterisk (*) are required.</p>';
 
 				// add a progress bar:
 				htmlCode += '<hr><div id="progressMsg" class="progress">' + self._progressMsg + "</div>";
