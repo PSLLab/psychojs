@@ -978,6 +978,7 @@ export function addAbortButton(config, mon_function) {
   buttonDiv.style.cssText = style;
   buttonDiv.setAttribute("title", tooltip);
   buttonDiv.addEventListener("click", function () {
+     // psychoJS.gui.dialog({warning: confirmText, onOk: mon_function(msg, false)});
     if (!confirm || window.confirm(confirmText)) {
       mon_function(msg, false);
     }
