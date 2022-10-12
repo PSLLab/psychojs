@@ -2,8 +2,8 @@
  * Logger
  *
  * @author Alain Pitiot
- * @version 2021.2.0
- * @copyright (c) 2017-2020 Ilixa Ltd. (http://ilixa.com) (c) 2020-2021 Open Science Tools Ltd. (https://opensciencetools.org)
+ * @version 2022.2.3
+ * @copyright (c) 2017-2020 Ilixa Ltd. (http://ilixa.com) (c) 2020-2022 Open Science Tools Ltd. (https://opensciencetools.org)
  * @license Distributed under the terms of the MIT License
  */
 
@@ -18,13 +18,14 @@ import * as util from "../util/Util.js";
  * a remote one, etc.</p>
  *
  * <p>Note: we use log4javascript for the console logger, and our own for the server logger.</p>
- *
- * @name module:core.Logger
- * @class
- * @param {*} threshold - the logging threshold, e.g. log4javascript.Level.ERROR
  */
 export class Logger
 {
+	/**
+	 * @memberof module:core
+	 * @param {module:core.PsychoJS} psychoJS - the PsychoJS instance
+	 * @param {*} threshold - the logging threshold, e.g. log4javascript.Level.ERROR
+	 */
 	constructor(psychoJS, threshold)
 	{
 		this._psychoJS = psychoJS;
@@ -70,8 +71,6 @@ export class Logger
 	/**
 	 * Change the logging level.
 	 *
-	 * @name module:core.Logger#setLevel
-	 * @public
 	 * @param {module:core.Logger.ServerLevel} serverLevel - the new logging level
 	 */
 	setLevel(serverLevel)
@@ -83,8 +82,6 @@ export class Logger
 	/**
 	 * Log a server message at the EXP level.
 	 *
-	 * @name module:core.Logger#exp
-	 * @public
 	 * @param {string} msg - the message to be logged.
 	 * @param {number} [time] - the logging time
 	 * @param {object} [obj] - the associated object (e.g. a Trial)
@@ -97,8 +94,6 @@ export class Logger
 	/**
 	 * Log a server message at the DATA level.
 	 *
-	 * @name module:core.Logger#data
-	 * @public
 	 * @param {string} msg - the message to be logged.
 	 * @param {number} [time] - the logging time
 	 * @param {object} [obj] - the associated object (e.g. a Trial)
@@ -111,8 +106,6 @@ export class Logger
 	/**
 	 * Log a server message.
 	 *
-	 * @name module:core.Logger#log
-	 * @public
 	 * @param {string} msg - the message to be logged.
 	 * @param {module:core.Logger.ServerLevel} level - logging level
 	 * @param {number} [time] - the logging time
@@ -153,9 +146,7 @@ export class Logger
 	/**
 	 * Check whether or not a log messages must be throttled.
 	 *
-	 * @name module:core.Logger#_throttle
 	 * @protected
-	 *
 	 * @param {number} time - the time of the latest log message
 	 * @return {boolean} whether or not to log the message
 	 */
@@ -231,9 +222,6 @@ export class Logger
 	 *
 	 * <p>Note: the logs are compressed using Pako's zlib algorithm.
 	 * See https://github.com/nodeca/pako for details.</p>
-	 *
-	 * @name module:core.Logger#flush
-	 * @public
 	 */
 	async flush({sync = false} = {})
 	{
@@ -380,8 +368,7 @@ export class Logger
 	/**
 	 * Create a custom console layout.
 	 *
-	 * @name module:core.Logger#_customConsoleLayout
-	 * @private
+	 * @protected
 	 * @return {*} the custom layout
 	 */
 	_customConsoleLayout()
@@ -452,7 +439,6 @@ export class Logger
 	/**
 	 * Get the integer value associated with a logging level.
 	 *
-	 * @name module:core.Logger#_getValue
 	 * @protected
 	 * @param {module:core.Logger.ServerLevel} level - the logging level
 	 * @return {number} - the value associated with the logging level, or 30 is the logging level is unknown.
@@ -467,10 +453,8 @@ export class Logger
 /**
  * Server logging level.
  *
- * @name module:core.Logger#ServerLevel
  * @enum {Symbol}
  * @readonly
- * @public
  *
  * @note These are similar to PsychoPy's logging levels, as defined in logging.py
  */
@@ -490,7 +474,6 @@ Logger.ServerLevel = {
  *
  * <p>We use those values to determine whether a log is to be sent to the server or not.</p>
  *
- * @name module:core.Logger#_ServerLevelValue
  * @enum {number}
  * @readonly
  * @protected

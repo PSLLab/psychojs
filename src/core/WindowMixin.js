@@ -2,8 +2,8 @@
  * Mixin implementing various unit-handling measurement methods.
  *
  * @author Alain Pitiot
- * @version 2021.2.0
- * @copyright (c) 2017-2020 Ilixa Ltd. (http://ilixa.com) (c) 2020-2021 Open Science Tools Ltd. (https://opensciencetools.org)
+ * @version 2022.2.3
+ * @copyright (c) 2017-2020 Ilixa Ltd. (http://ilixa.com) (c) 2020-2022 Open Science Tools Ltd. (https://opensciencetools.org)
  * @license Distributed under the terms of the MIT License
  */
 
@@ -76,14 +76,14 @@ export let WindowMixin = (superclass) =>
 		}
 
 		/**
-	 * Convert the given length from pixel units to the stimulus units
-	 *
-	 * @name module:core.WindowMixin#_getLengthUnits
-	 * @function
-	 * @protected
-	 * @param {number} length_px - the length in pixel units
-	 * @return {number} - the length in stimulus units
-	 */
+		 * Convert the given length from pixel units to the stimulus units
+		 *
+		 * @name module:core.WindowMixin#_getLengthUnits
+		 * @function
+		 * @protected
+		 * @param {number} length_px - the length in pixel units
+		 * @return {number} - the length in stimulus units
+		 */
 		_getLengthUnits(length_px)
 		{
 			let response = {

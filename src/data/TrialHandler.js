@@ -4,8 +4,8 @@
  *
  * @author Alain Pitiot
  * @author Hiroyuki Sogo & Sotiri Bakagiannis  - better support for BOM and accented characters
- * @version 2021.2.0
- * @copyright (c) 2017-2020 Ilixa Ltd. (http://ilixa.com) (c) 2020-2021 Open Science Tools Ltd. (https://opensciencetools.org)
+ * @version 2022.2.3
+ * @copyright (c) 2017-2020 Ilixa Ltd. (http://ilixa.com) (c) 2020-2022 Open Science Tools Ltd. (https://opensciencetools.org)
  * @license Distributed under the terms of the MIT License
  */
 
@@ -17,25 +17,12 @@ import * as util from "../util/Util.js";
 /**
  * <p>A Trial Handler handles the importing and sequencing of conditions.</p>
  *
- * @class
  * @extends PsychObject
- * @param {Object} options
- * @param {module:core.PsychoJS} options.psychoJS - the PsychoJS instance
- * @param {Array.<Object> | String} [options.trialList= [undefined] ] - if it is a string, we treat it as the name of a condition resource
- * @param {number} options.nReps - number of repetitions
- * @param {module:data.TrialHandler.Method} options.method - the trial method
- * @param {Object} options.extraInfo - additional information to be stored alongside the trial data, e.g. session ID, participant ID, etc.
- * @param {number} options.seed - seed for the random number generator
- * @param {boolean} [options.autoLog= false] - whether or not to log
  */
 export class TrialHandler extends PsychObject
 {
 	/**
 	 * Getter for experimentHandler.
-	 *
-	 * @name module:core.Window#experimentHandler
-	 * @function
-	 * @public
 	 */
 	get experimentHandler()
 	{
@@ -44,10 +31,6 @@ export class TrialHandler extends PsychObject
 
 	/**
 	 * Setter for experimentHandler.
-	 *
-	 * @name module:core.Window#experimentHandler
-	 * @function
-	 * @public
 	 */
 	set experimentHandler(exp)
 	{
@@ -55,8 +38,14 @@ export class TrialHandler extends PsychObject
 	}
 
 	/**
-	 * @constructor
-	 * @public
+	 * @param {Object} options - the handler options
+	 * @param {module:core.PsychoJS} options.psychoJS - the PsychoJS instance
+	 * @param {Array.<Object> | String} [options.trialList= [undefined] ] - if it is a string, we treat it as the name of a condition resource
+	 * @param {number} options.nReps - number of repetitions
+	 * @param {module:data.TrialHandler.Method} options.method - the trial method
+	 * @param {Object} options.extraInfo - additional information to be stored alongside the trial data, e.g. session ID, participant ID, etc.
+	 * @param {number} options.seed - seed for the random number generator
+	 * @param {boolean} [options.autoLog= false] - whether or not to log
 	 *
 	 * @todo extraInfo is not taken into account, we use the expInfo of the ExperimentHandler instead
 	 */
@@ -80,7 +69,7 @@ export class TrialHandler extends PsychObject
 		this._addAttribute("name", name);
 		this._addAttribute("autoLog", autoLog);
 		this._addAttribute("seed", seed);
-		this._prepareTrialList(trialList);
+		this._prepareTrialList();
 
 		// number of stimuli
 		this.nStim = this.trialList.length;
@@ -223,7 +212,6 @@ export class TrialHandler extends PsychObject
 	 *
 	 * <p>This is typically used in the LoopBegin function, in order to capture the current state of a TrialHandler</p>
 	 *
-	 * @public
 	 * @return {Snapshot} - a snapshot of the current internal state.
 	 */
 	getSnapshot()
@@ -294,11 +282,10 @@ export class TrialHandler extends PsychObject
 	}
 
 	/**
-	 * Set the internal state of this trial handler from the given snapshot.
+	 * Set the internal state of the snapshot's trial handler from the snapshot.
 	 *
-	 * @public
-	 * @static
-	 * @param {Snapshot} snapshot - the snapshot from which to update the current internal state.
+	 * @param {Snapshot} snapshot - the snapshot from which to update the current internal state of the
+	 * 	snapshot's trial handler
 	 */
 	static fromSnapshot(snapshot)
 	{
@@ -317,7 +304,6 @@ export class TrialHandler extends PsychObject
 		snapshot.handler.thisIndex = snapshot.thisIndex;
 		snapshot.handler.ran = snapshot.ran;
 		snapshot.handler._finished = snapshot._finished;
-
 		snapshot.handler.thisTrial = snapshot.handler.getCurrentTrial();
 
 		// add the snapshot's trial attributes to a global variable, whose name is derived from
@@ -365,7 +351,6 @@ export class TrialHandler extends PsychObject
 	/**
 	 * Get the trial index.
 	 *
-	 * @public
 	 * @return {number} the current trial index
 	 */
 	getTrialIndex()
@@ -389,7 +374,6 @@ export class TrialHandler extends PsychObject
 	 * <p>Note: we assume that all trials in the trialList share the same attributes
 	 * and consequently consider only the attributes of the first trial.</p>
 	 *
-	 * @public
 	 * @return {Array.string} the attributes
 	 */
 	getAttributes()
@@ -411,7 +395,6 @@ export class TrialHandler extends PsychObject
 	/**
 	 * Get the current trial.
 	 *
-	 * @public
 	 * @return {Object} the current trial
 	 */
 	getCurrentTrial()
@@ -438,7 +421,6 @@ export class TrialHandler extends PsychObject
 	/**
 	 * Get the nth future or past trial, without advancing through the trial list.
 	 *
-	 * @public
 	 * @param {number} [n = 1] - increment
 	 * @return {Object|undefined} the future trial (if n is positive) or past trial (if n is negative)
 	 * or undefined if attempting to go beyond the last trial.
@@ -457,7 +439,6 @@ export class TrialHandler extends PsychObject
 	 * Get the nth previous trial.
 	 * <p> Note: this is useful for comparisons in n-back tasks.</p>
 	 *
-	 * @public
 	 * @param {number} [n = -1] - increment
 	 * @return {Object|undefined} the past trial or undefined if attempting to go prior to the first trial.
 	 */
@@ -469,7 +450,6 @@ export class TrialHandler extends PsychObject
 	/**
 	 * Add a key/value pair to data about the current trial held by the experiment handler
 	 *
-	 * @public
 	 * @param {Object} key - the key
 	 * @param {Object} value - the value
 	 */
@@ -508,8 +488,6 @@ export class TrialHandler extends PsychObject
 	 *	'5:'
 	 *	'-5:-2, 9, 11:5:22'
 	 *
-	 * @public
-	 * @static
 	 * @param {module:core.ServerManager} serverManager - the server manager
 	 * @param {String} resourceName - the name of the resource containing the list of conditions, which must have been registered with the server manager.
 	 * @param {Object} [selection = null] - the selection
@@ -520,7 +498,7 @@ export class TrialHandler extends PsychObject
 	{
 		try
 		{
-			let resourceExtension = resourceName.split(".").pop();
+			const resourceExtension = resourceName.split(".").pop();
 			if (["csv", "odp", "xls", "xlsx"].indexOf(resourceExtension) > -1)
 			{
 				// (*) read conditions from resource:
@@ -551,9 +529,9 @@ export class TrialHandler extends PsychObject
 
 				// (*) return the selected conditions as an array of 'object as map':
 				// [
-				// 		{field0: value0-0, field1: value0-1, ...}
-				// 		{field0: value1-0, field1: value1-1, ...}
-				// 		...
+				// {field0: value0-0, field1: value0-1, ...}
+				// {field0: value1-0, field1: value1-1, ...}
+				// ...
 				// ]
 				let trialList = new Array(selectedRows.length - 1);
 				for (let r = 0; r < selectedRows.length; ++r)
@@ -618,9 +596,9 @@ export class TrialHandler extends PsychObject
 	 * Prepare the trial list.
 	 *
 	 * @protected
-	 * @param {Array.<Object> | String} trialList - a list of trials, or the name of a condition resource
+	 * @returns {void}
 	 */
-	_prepareTrialList(trialList)
+	_prepareTrialList()
 	{
 		const response = {
 			origin: "TrialHandler._prepareTrialList",
@@ -628,33 +606,33 @@ export class TrialHandler extends PsychObject
 		};
 
 		// we treat undefined trialList as a list with a single empty entry:
-		if (typeof trialList === "undefined")
+		if (typeof this._trialList === "undefined")
 		{
 			this.trialList = [undefined];
 		}
 		// if trialList is an array, we make sure it is not empty:
-		else if (Array.isArray(trialList))
+		else if (Array.isArray(this._trialList))
 		{
-			if (trialList.length === 0)
+			if (this._trialList.length === 0)
 			{
 				this.trialList = [undefined];
 			}
 		}
 		// if trialList is a string, we treat it as the name of the condition resource:
-		else if (typeof trialList === "string")
+		else if (typeof this._trialList === "string")
 		{
-			this.trialList = TrialHandler.importConditions(this.psychoJS.serverManager, trialList);
+			this.trialList = TrialHandler.importConditions(this.psychoJS.serverManager, this._trialList);
 		}
 		// unknown type:
 		else
 		{
 			throw Object.assign(response, {
-				error: "unable to prepare trial list: unknown type: " + (typeof trialList),
+				error: `unable to prepare trial list: unknown type: ${(typeof this._trialList)}`
 			});
 		}
 	}
 
-	/*
+	/**
 	 * Prepare the sequence of trials.
 	 *
 	 * <p>The returned sequence is a matrix (an array of arrays) of trial indices
@@ -679,7 +657,7 @@ export class TrialHandler extends PsychObject
 	 * </p>
 	 *
 	 * @protected
-	 */
+	 **/
 	_prepareSequence()
 	{
 		const response = {
@@ -687,16 +665,16 @@ export class TrialHandler extends PsychObject
 			context: "when preparing a sequence of trials",
 		};
 
-		// get an array of the indices of the elements of trialList :
+		// get an array of the indices of the elements of trialList:
 		const indices = Array.from(this.trialList.keys());
 
-		if (this.method === TrialHandler.Method.SEQUENTIAL)
+		if (this._method === TrialHandler.Method.SEQUENTIAL)
 		{
 			this._trialSequence = Array(this.nReps).fill(indices);
 			// transposed version:
 			// this._trialSequence = indices.reduce( (seq, e) => { seq.push( Array(this.nReps).fill(e) ); return seq; }, [] );
 		}
-		else if (this.method === TrialHandler.Method.RANDOM)
+		else if (this._method === TrialHandler.Method.RANDOM)
 		{
 			this._trialSequence = [];
 			for (let i = 0; i < this.nReps; ++i)
@@ -704,10 +682,10 @@ export class TrialHandler extends PsychObject
 				this._trialSequence.push(util.shuffle(indices.slice(), this._randomNumberGenerator));
 			}
 		}
-		else if (this.method === TrialHandler.Method.FULL_RANDOM)
+		else if (this._method === TrialHandler.Method.FULL_RANDOM)
 		{
 			// create a flat sequence with nReps repeats of indices:
-			let flatSequence = [];
+			const flatSequence = [];
 			for (let i = 0; i < this.nReps; ++i)
 			{
 				flatSequence.push.apply(flatSequence, indices);
@@ -737,7 +715,6 @@ export class TrialHandler extends PsychObject
  *
  * @enum {Symbol}
  * @readonly
- * @public
  */
 TrialHandler.Method = {
 	/**

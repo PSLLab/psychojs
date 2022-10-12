@@ -2,8 +2,8 @@
  * Experiment Handler
  *
  * @author Alain Pitiot
- * @version 2021.2.0
- * @copyright (c) 2017-2020 Ilixa Ltd. (http://ilixa.com) (c) 2020-2021 Open Science Tools Ltd. (https://opensciencetools.org)
+ * @version 2022.2.3
+ * @copyright (c) 2017-2020 Ilixa Ltd. (http://ilixa.com) (c) 2020-2022 Open Science Tools Ltd. (https://opensciencetools.org)
  * @license Distributed under the terms of the MIT License
  */
 
@@ -17,22 +17,12 @@ import * as util from "../util/Util.js";
  * for generating a single data file from an experiment with many different loops (e.g. interleaved
  * staircases or loops within loops.</p>
  *
- * @name module:data.ExperimentHandler
- * @class
  * @extends PsychObject
- * @param {Object} options
- * @param {module:core.PsychoJS} options.psychoJS - the PsychoJS instance
- * @param {string} options.name - name of the experiment
- * @param {Object} options.extraInfo - additional information, such as session name, participant name, etc.
  */
 export class ExperimentHandler extends PsychObject
 {
 	/**
 	 * Getter for experimentEnded.
-	 *
-	 * @name module:core.Window#experimentEnded
-	 * @function
-	 * @public
 	 */
 	get experimentEnded()
 	{
@@ -41,10 +31,6 @@ export class ExperimentHandler extends PsychObject
 
 	/**
 	 * Setter for experimentEnded.
-	 *
-	 * @name module:core.Window#experimentEnded
-	 * @function
-	 * @public
 	 */
 	set experimentEnded(ended)
 	{
@@ -64,15 +50,43 @@ export class ExperimentHandler extends PsychObject
 		return this._trialsData;
 	}
 
+	/**
+	 * @memberof module:data
+	 * @param {Object} options
+	 * @param {module:core.PsychoJS} options.psychoJS - the PsychoJS instance
+	 * @param {string} options.name - name of the experiment
+	 * @param {Object} options.extraInfo - additional information, such as session name, participant name, etc.
+	 */
 	constructor({
 		psychoJS,
 		name,
 		extraInfo,
+		dataFileName
 	} = {})
 	{
 		super(psychoJS, name);
 
 		this._addAttribute("extraInfo", extraInfo);
+
+		// process the extra info:
+		this._experimentName = (typeof extraInfo.expName === "string" && extraInfo.expName.length > 0)
+			? extraInfo.expName
+			: this.psychoJS.config.experiment.name;
+		this._participant = (typeof extraInfo.participant === "string" && extraInfo.participant.length > 0)
+			? extraInfo.participant
+			: "PARTICIPANT";
+		this._session = (typeof extraInfo.session === "string" && extraInfo.session.length > 0)
+			? extraInfo.session
+			: "SESSION";
+		this._datetime = (typeof extraInfo.date !== "undefined")
+			? extraInfo.date
+			: MonotonicClock.getDateStr();
+
+		this._addAttribute(
+			"dataFileName",
+			dataFileName,
+			`${this._participant}_${this._experimentName}_${this._datetime}`
+		);
 
 		// loop handlers:
 		this._loops = [];
@@ -90,10 +104,8 @@ export class ExperimentHandler extends PsychObject
 	 * Whether or not the current entry (i.e. trial data) is empty.
 	 * <p>Note: this is mostly useful at the end of an experiment, in order to ensure that the last entry is saved.</p>
 	 *
-	 * @name module:data.ExperimentHandler#isEntryEmpty
-	 * @function
-	 * @public
 	 * @returns {boolean} whether or not the current entry is empty
+	 * @todo This really should be renamed: IsCurrentEntryNotEmpty
 	 */
 	isEntryEmpty()
 	{
@@ -106,9 +118,6 @@ export class ExperimentHandler extends PsychObject
 	 * <p> The loop might be a {@link TrialHandler}, for instance.</p>
 	 * <p> Data from this loop will be included in the resulting data files.</p>
 	 *
-	 * @name module:data.ExperimentHandler#addLoop
-	 * @function
-	 * @public
 	 * @param {Object} loop - the loop, e.g. an instance of TrialHandler or StairHandler
 	 */
 	addLoop(loop)
@@ -121,9 +130,6 @@ export class ExperimentHandler extends PsychObject
 	/**
 	 * Remove the given loop from the list of unfinished loops, e.g. when it has completed.
 	 *
-	 * @name module:data.ExperimentHandler#removeLoop
-	 * @function
-	 * @public
 	 * @param {Object} loop - the loop, e.g. an instance of TrialHandler or StairHandler
 	 */
 	removeLoop(loop)
@@ -141,9 +147,6 @@ export class ExperimentHandler extends PsychObject
 	 * <p> Multiple key/value pairs can be added to any given entry of the data file. There are
 	 * considered part of the same entry until a call to {@link nextEntry} is made. </p>
 	 *
-	 * @name module:data.ExperimentHandler#addData
-	 * @function
-	 * @public
 	 * @param {Object} key - the key
 	 * @param {Object} value - the value
 	 */
@@ -167,10 +170,7 @@ export class ExperimentHandler extends PsychObject
 	 * Inform this ExperimentHandler that the current trial has ended.  Further calls to {@link addData}
 	 * will be associated with the next trial.
 	 *
-	 * @name module:data.ExperimentHandler#nextEntry
-	 * @function
-	 * @public
-	 * @param {Object[]} snapshots - array of loop snapshots
+	 * @param {Object | Object[] | undefined} snapshots - array of loop snapshots
 	 */
 	nextEntry(snapshots)
 	{
@@ -234,21 +234,22 @@ export class ExperimentHandler extends PsychObject
 	 * </ul>
 	 * <p>
 	 *
-	 * @name module:data.ExperimentHandler#save
-	 * @function
-	 * @public
 	 * @param {Object} options
 	 * @param {Array.<Object>} [options.attributes] - the attributes to be saved
-	 * @param {Array.<Object>} [options.sync] - whether or not to communicate with the server in a synchronous manner
+	 * @param {boolean} [options.sync=false] - whether or not to communicate with the server in a synchronous manner
+	 * @param {string} [options.tag=''] - an optional tag to add to the filename to which the data is saved (for CSV and XLSX saving options)
+	 * @param {boolean} [options.clear=false] - whether or not to clear all experiment results immediately after they are saved (this is useful when saving data in separate chunks, throughout an experiment)
 	 */
 	async save({
 		attributes = [],
 		sync = false,
+		tag = "",
+		clear = false
 	} = {})
 	{
 		this._psychoJS.logger.info("[PsychoJS] Save experiment results.");
 
-		// (*) get attributes:
+		// get attributes:
 		if (attributes.length === 0)
 		{
 			attributes = this._trialsKeys.slice();
@@ -274,26 +275,27 @@ export class ExperimentHandler extends PsychObject
 			}
 		}
 
-		// (*) get various experiment info:
-		const info = this.extraInfo;
-		const __experimentName = (typeof info.expName !== "undefined") ? info.expName : this.psychoJS.config.experiment.name;
-		const __participant = ((typeof info.participant === "string" && info.participant.length > 0) ? info.participant : "PARTICIPANT");
-		const __session = ((typeof info.session === "string" && info.session.length > 0) ? info.session : "SESSION");
-		const __datetime = ((typeof info.date !== "undefined") ? info.date : MonotonicClock.getDateStr());
-		const gitlabConfig = this._psychoJS.config.gitlab;
-		const __projectId = (typeof gitlabConfig !== "undefined" && typeof gitlabConfig.projectId !== "undefined") ? gitlabConfig.projectId : undefined;
+		let data = this._trialsData;
+		// if the experiment data have to be cleared, we first make a copy of them:
+		if (clear)
+		{
+			data = this._trialsData.slice();
+			this._trialsData = [];
+		}
 
-		// (*) save to a .csv file:
+		// save to a .csv file:
 		if (this._psychoJS.config.experiment.saveFormat === ExperimentHandler.SaveFormat.CSV)
 		{
 			// note: we use the XLSX library as it automatically deals with header, takes care of quotes,
 			// newlines, etc.
-			const worksheet = XLSX.utils.json_to_sheet(this._trialsData);
+			// TODO only save the given attributes
+			const worksheet = XLSX.utils.json_to_sheet(data);
 			// prepend BOM
 			const csv = "\ufeff" + XLSX.utils.sheet_to_csv(worksheet);
 
 			// upload data to the pavlovia server or offer them for download:
-			const key = __participant + "_" + __experimentName + "_" + __datetime + ".csv";
+			const filenameWithoutPath = this._dataFileName.split(/[\\/]/).pop();
+			const key = `${filenameWithoutPath}${tag}.csv`;
 			if (
 				this._psychoJS.getEnvironment() === ExperimentHandler.Environment.SERVER
 				&& this._psychoJS.config.experiment.status === "RUNNING"
@@ -318,17 +320,26 @@ export class ExperimentHandler extends PsychObject
 				util.offerDataForDownload(key, csv, "text/csv");
 			}
 		}
-		// (*) save in the database on the remote server:
+		// save to the database on the pavlovia server:
 		else if (this._psychoJS.config.experiment.saveFormat === ExperimentHandler.SaveFormat.DATABASE)
 		{
+			const gitlabConfig = this._psychoJS.config.gitlab;
+			const __projectId = (typeof gitlabConfig !== "undefined" && typeof gitlabConfig.projectId !== "undefined") ? gitlabConfig.projectId : undefined;
+
 			let documents = [];
 
-			for (let r = 0; r < this._trialsData.length; r++)
+			for (let r = 0; r < data.length; r++)
 			{
-				let doc = { __projectId, __experimentName, __participant, __session, __datetime };
+				let doc = {
+					__projectId,
+					__experimentName: this._experimentName,
+					__participant: this._participant,
+					__session: this._session,
+					__datetime: this._datetime
+				};
 				for (let h = 0; h < attributes.length; h++)
 				{
-					doc[attributes[h]] = this._trialsData[r][attributes[h]];
+					doc[attributes[h]] = data[r][attributes[h]];
 				}
 
 				documents.push(doc);
@@ -355,9 +366,6 @@ export class ExperimentHandler extends PsychObject
 	 * Get the attribute names and values for the current trial of a given loop.
 	 * <p> Only info relating to the trial execution are returned.</p>
 	 *
-	 * @name module:data.ExperimentHandler#_getLoopAttributes
-	 * @function
-	 * @static
 	 * @protected
 	 * @param {Object} loop - the loop
 	 */
@@ -417,10 +425,8 @@ export class ExperimentHandler extends PsychObject
 /**
  * Experiment result format
  *
- * @name module:core.ServerManager#SaveFormat
  * @enum {Symbol}
  * @readonly
- * @public
  */
 ExperimentHandler.SaveFormat = {
 	/**
@@ -439,7 +445,6 @@ ExperimentHandler.SaveFormat = {
  *
  * @enum {Symbol}
  * @readonly
- * @public
  */
 ExperimentHandler.Environment = {
 	SERVER: Symbol.for('SERVER'),
