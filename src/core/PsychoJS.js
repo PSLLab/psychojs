@@ -652,11 +652,12 @@ export class PsychoJS
 
 			} else if ((experimentUrl.indexOf('https://experiment.psllab.org/') === 0) ||
                  (experimentUrl.indexOf('http://127.0.0.1:9000/') === 0)) {
-        this._config = {
+        		this._config = {
 					environment: ExperimentHandler.Environment.JATOS,
 					experiment: { name, saveFormat: ExperimentHandler.SaveFormat.CSV }
 				};
-      }
+				this._serverManager._preloadQueue.setMaxConnections(10);
+      		}
 			// otherwise we create an ad-hoc configuration:
 			else
 			{

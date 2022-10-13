@@ -1214,9 +1214,6 @@ export class ServerManager extends PsychObject
 		};
 
 		this._preloadQueue = new createjs.LoadQueue(true, "", true);
-		if (this._psychoJS.config.environment === ExperimentHandler.Environment.JATOS) {
-			this._preloadQueue.setMaxConnections(10);
-		}
 		const self = this;
 
 		// the loading of a specific resource has started:

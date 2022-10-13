@@ -130,7 +130,7 @@ export class GUI
 				markup += "<div class='dialog-content'>";
 
 				// alert title and close button:
-				markup += `<div id='experiment-dialog-title' class='dialog-title'><p>${title}</p><button id='dialogClose' class='dialog-close' data-a11y-dialog-hide aria-label='Cancel Experiment'>&times;</button></div>`;
+				markup += `<div id='experiment-dialog-title' class='dialog-title'><p>${title}</p></div>`;
 
 				// logo, if need be:
 				if (typeof logoUrl === "string")
@@ -205,7 +205,9 @@ export class GUI
 
 				// buttons:
 				markup += "<hr>";
-				markup += "<button id='dialogCancel' class='dialog-button' aria-label='Cancel Experiment'>Cancel</button>";
+				if (self._psychoJS.getEnvironment() !== ExperimentHandler.Environment.JATOS) {
+					markup += "<button id='dialogCancel' class='dialog-button' aria-label='Cancel Experiment'>Cancel</button>";
+				}
 				if (self._requireParticipantClick)
 				{
 					markup += "<button id='dialogOK' class='dialog-button disabled' aria-label='Start Experiment'>Ok</button>";
@@ -233,8 +235,8 @@ export class GUI
 					self._okButton = document.getElementById("dialogOK");
 					self._okButton.onclick = self._onStartExperiment.bind(self);
 				}
-				self._closeButton = document.getElementById("dialogClose");
-				self._closeButton.onclick = self._onCancelExperiment.bind(self);
+				// self._closeButton = document.getElementById("dialogClose");
+				// self._closeButton.onclick = self._onCancelExperiment.bind(self);
 
 				// update the OK button status:
 				self._updateDialog();
