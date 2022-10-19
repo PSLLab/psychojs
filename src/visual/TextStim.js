@@ -69,6 +69,7 @@ export class TextStim extends util.mix(VisualStim).with(ColorMixin)
 			italic,
 			alignHoriz,
 			alignVert,
+			alignText,
 			wrapWidth,
 			flipHoriz,
 			flipVert,
@@ -93,6 +94,10 @@ export class TextStim extends util.mix(VisualStim).with(ColorMixin)
 				}
 			};
 		};
+
+		if (typeof alignText === "string") {
+			alignHoriz = alignText;
+		}
 
 		// text and font:
 		this._addAttribute(
