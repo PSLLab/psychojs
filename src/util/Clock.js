@@ -96,7 +96,9 @@ export class MonotonicClock
 			// yyyy-mm-dd_hh[h]mm:ss.sss
 			.replace(":", "h")
 			// yyyy-mm-dd_hh[h]mm.ss.sss
-			.replace(":", ".");
+			.replace(":", ".")
+			// fix issues in some countries/browswers where it doesn't follow the en-CA locale
+			.replace(/\//g, '-');
 	}
 }
 
