@@ -3,8 +3,7 @@
  *
  * @author Alain Pitiot
  * @author Sijia Zhao - fine-grained resource loading
- * @version 2021.2.3
- * @copyright (c) 2017-2020 Ilixa Ltd. (http://ilixa.com) (c) 2020-2022 Open Science Tools Ltd. (https://opensciencetools.org)
+ * @copyright (c) 2017-2020 Ilixa Ltd. (http://ilixa.com) (c) 2020-2024 Open Science Tools Ltd. (https://opensciencetools.org)
  * @license Distributed under the terms of the MIT License
  */
 
@@ -50,6 +49,9 @@ export class GUI
 	{
 		this._psychoJS = psychoJS;
 
+		// info fields excluded from the GUI:
+		this._excludedInfo = {};
+
 		// gui listens to RESOURCE events from the server manager:
 		psychoJS.serverManager.on(ServerManager.Event.RESOURCE, (signal) =>
 		{
@@ -77,25 +79,26 @@ export class GUI
 	 * @param {Object} options.dictionary - associative array of values for the participant to set
 	 * @param {String} options.title - name of the project
 	 * @param {boolean} [options.requireParticipantClick=true] - whether the participant must click on the OK
-     * 	button, when it becomes enabled, to move on with the experiment
+   * 	button, when it becomes enabled, to move on with the experiment
+	 * @param {boolean} [options.OKAlwaysEnabledForLocal=false] - whether the OK button is always enabled
+	 * 	when the experiment runs locally
 	 */
 	DlgFromDict({
 		logoUrl,
 		text,
 		dictionary,
 		title,
-		requireParticipantClick = GUI.DEFAULT_SETTINGS.DlgFromDict.requireParticipantClick
+		requireParticipantClick = GUI.DEFAULT_SETTINGS.DlgFromDict.requireParticipantClick,
+		OKAlwaysEnabledForLocal = true
 	})
 	{
-		// get info from URL:
-		const infoFromUrl = util.getUrlParameters();
-
 		this._progressBarMax = 0;
 		this._allResourcesDownloaded = false;
 		this._requiredKeys = [];
 		this._setRequiredKeys = new Map();
 		this._progressMessage = "&nbsp;";
 		this._requireParticipantClick = requireParticipantClick;
+		this._OKAlwaysEnabledForLocal = OKAlwaysEnabledForLocal;
 		this._dictionary = dictionary;
 
 		// prepare a PsychoJS component:
@@ -112,6 +115,19 @@ export class GUI
 			{
 				self._dialogComponent.tStart = t;
 				self._dialogComponent.status = PsychoJS.Status.STARTED;
+
+				// prepare the info fields excluded from the GUI, including those from the URL:
+				const excludedInfo = {};
+				for (let key in self._excludedInfo)
+				{
+					excludedInfo[key.trim().toLowerCase()] = self._excludedInfo[key];
+				}
+				const infoFromUrl = util.getUrlParameters();
+				infoFromUrl.forEach((value, key) =>
+				{
+					excludedInfo[key.trim().toLowerCase()] = value;
+				});
+
 
 				// if the experiment is licensed, and running on the license rather than on credit,
 				// we use the license logo:
@@ -139,14 +155,16 @@ export class GUI
 				}
 
 				// add a combobox or text areas for each entry in the dictionary:
+				let atLeastOneIncludedKey = false;
 				Object.keys(dictionary).forEach((key, keyIdx) =>
 				{
 					const value = dictionary[key];
 					const keyId = "form-input-" + keyIdx;
 
 					// only create an input if the key is not in the URL:
-					let inUrl = false;
 					const cleanedDictKey = key.trim().toLowerCase();
+					const isIncluded = !(cleanedDictKey in excludedInfo);
+					/*let inUrl = false;
 					infoFromUrl.forEach((urlValue, urlKey) =>
 					{
 						const cleanedUrlKey = urlKey.trim().toLowerCase();
@@ -155,17 +173,33 @@ export class GUI
 							inUrl = true;
 							// break;
 						}
-					});
+					});*/
 
-					if (!inUrl)
+					if (isIncluded)
+					// if (!inUrl)
 					{
-						markup += `<label for='${keyId}'> ${key} </label>`;
+						atLeastOneIncludedKey = true;
 
-						// if the field is required:
+						// deal with field options:
+						// - if the field is required:
+						if (key.slice(-4) === "|req")
+						{
+							key = `${key.slice(0, -4)}*`;
+						}
 						if (key.slice(-1) === "*")
 						{
 							self._requiredKeys.push(keyId);
 						}
+						// - all other new options are currently discarded
+						// TODO
+
+						// remove the new option extensions:
+						if (key.slice(-4) === "|req" || key.slice(-4) === "|cfg" || key.slice(-4) === "|fix" || key.slice(-4) === "|opt")
+						{
+							key = key.slice(0, -4);
+						}
+
+						markup += `<label for='${keyId}'> ${key} </label>`;
 
 						// if value is an array, we create a select drop-down menu:
 						if (Array.isArray(value))
@@ -185,7 +219,7 @@ export class GUI
 
 							markup += "</select>";
 						}
-							// otherwise we use a single string input:
+						// otherwise we use a single string input:
 						//if (typeof value === 'string')
 						else
 						{
@@ -199,19 +233,29 @@ export class GUI
 					markup += "<p class='validateTips'>Fields marked with an asterisk (*) are required.</p>";
 				}
 
+				markup += "</div>"; // scrollable-container
+
+				// separator, if need be:
+				if (atLeastOneIncludedKey)
+				{
+					markup += "<hr>";
+				}
+
 				// progress bar:
-				markup += `<hr><div id='progressMsg' class='progress-msg'>${self._progressMessage}</div>`;
+				markup += `<div id='progressMsg' class='progress-msg'>${self._progressMessage}</div>`;
 				markup += "<div class='progress-container'><div id='progressBar' class='progress-bar'></div></div>";
 
 				// buttons:
 				markup += "<hr>";
 				if (self._psychoJS.getEnvironment() !== ExperimentHandler.Environment.JATOS) {
+					markup += "<div class='dialog-button-group'>";
 					markup += "<button id='dialogCancel' class='dialog-button' aria-label='Cancel Experiment'>Cancel</button>";
 				}
 				if (self._requireParticipantClick)
 				{
 					markup += "<button id='dialogOK' class='dialog-button disabled' aria-label='Start Experiment'>Ok</button>";
 				}
+				markup += "</div>"; // button-group
 
 				markup += "</div></div>";
 
@@ -246,7 +290,7 @@ export class GUI
 				self._updateProgressBar();
 
 				// setup change event handlers for all required keys:
-				this._requiredKeys.forEach((keyId) =>
+				self._requiredKeys.forEach((keyId) =>
 				{
 					const input = document.getElementById(keyId);
 					if (input)
@@ -271,23 +315,30 @@ export class GUI
 	 * @callback GUI.onOK
 	 */
 	/**
+	 * @callback GUI.onCancel
+	 */
+	/**
 	 * Show a message to the participant in a dialog box.
 	 *
-	 * <p>This function can be used to display both warning and error messages.</p>
+	 * <p>This function can be used to display ordinary, warning, and error messages.</p>
 	 *
 	 * @param {Object} options
 	 * @param {string} options.message - the message to be displayed
 	 * @param {Object.<string, *>} options.error - an exception
 	 * @param {string} options.warning - a warning message
-	 * @param {boolean} [options.showOK=true] - specifies whether to show the OK button
+	 * @param {boolean} [options.showOK=true] - whether to show the OK button
 	 * @param {GUI.onOK} [options.onOK] - function called when the participant presses the OK button
+	 * @param {boolean} [options.showCancel=false] - whether to show the Cancel button
+	 * @param {GUI.onCancel} [options.onCancel] - function called when the participant presses the Cancel button
 	 */
 	dialog({
 		message,
 		warning,
 		error,
 		showOK = true,
-		onOK
+		onOK,
+		showCancel = false,
+		onCancel
 	} = {})
 	{
 		// close the previously opened dialog box, if there is one:
@@ -343,14 +394,18 @@ export class GUI
 			{
 				const error = this._userFriendlyError(errorCode);
 				markup += `<div id='experiment-dialog-title' class='dialog-title ${error.class}'><p>${error.title}</p></div>`;
+				markup += "<div class='scrollable-container'>";
 				markup += `<p>${error.text}</p>`;
+				markup += "</div>";
 			}
 			else
 			{
 				markup += `<div id='experiment-dialog-title' class='dialog-title dialog-error'><p>Error</p></div>`;
+				markup += "<div class='scrollable-container'>";
 				markup += `<p>Unfortunately we encountered the following error:</p>`;
 				markup += stackCode;
 				markup += "<p>Try to run the experiment again. If the error persists, contact the experiment designer.</p>";
+				markup += "</div>";
 			}
 		}
 
@@ -358,19 +413,36 @@ export class GUI
 		else if (typeof warning !== "undefined")
 		{
 			markup += `<div id='experiment-dialog-title' class='dialog-title dialog-warning'><p>Warning</p></div>`;
+			markup += "<div class='scrollable-container'>";
 			markup += `<p>${warning}</p>`;
+			markup += "</div>";
 		}
 
 		// we are displaying a message:
 		else if (typeof message !== "undefined")
 		{
-			markup += `<div id='experiment-dialog-title' class='dialog-title'><p>Message</p></div>`;
+			markup += "<div id='experiment-dialog-title' class='dialog-title'><p>Message</p></div>";
+			markup += "<div class='scrollable-container'>";
 			markup += `<p>${message}</p>`;
+			markup += "</div>";
 		}
 
-		if (showOK)
+		// if (showOK || showCancel)
+		// {
+		// 	markup += "<hr>";
+		// }
+		if (showCancel || showOK)
 		{
-			markup += "<hr><button id='dialogOK' class='dialog-button' aria-label='Close dialog'>Ok</button>";
+			markup += "<div class='dialog-button-group'>";
+			if (showCancel)
+			{
+				markup += "<button id='dialogCancel' class='dialog-button' aria-label='Close dialog'>Cancel</button>";
+			}
+			if (showOK)
+			{
+				markup += "<button id='dialogOK' class='dialog-button' aria-label='Close dialog'>Ok</button>";
+			}
+			markup += "</div>"; // button-group
 		}
 		markup += "</div></div>";
 
@@ -398,6 +470,20 @@ export class GUI
 				}
 			};
 		}
+		if (showCancel)
+		{
+			this._cancelButton = document.getElementById("dialogCancel");
+			this._cancelButton.onclick = () =>
+			{
+				this.closeDialog();
+
+				// execute callback function:
+				if (typeof onCancel !== "undefined")
+				{
+					onCancel();
+				}
+			};
+		}
 	}
 
 	/**
@@ -417,11 +503,15 @@ export class GUI
 		markup += "<div class='dialog-overlay'></div>";
 		markup += "<div class='dialog-content'>";
 		markup += `<div id='experiment-dialog-title' class='dialog-title dialog-warning'><p>Warning</p></div>`;
+
+		markup += "<div class='scrollable-container'>";
 		markup += `<p>${text}</p>`;
+		markup += "</div>";
 
 		// progress bar:
 		markup += `<hr><div id='progressMsg' class='progress-msg'>&nbsp;</div>`;
 		markup += "<div class='progress-container'><div id='progressBar' class='progress-bar'></div></div>";
+		markup += "<div class='dialog-button-group'></div>";
 
 		markup += "</div></div>";
 
@@ -518,6 +608,12 @@ export class GUI
 			const input = document.getElementById("form-input-" + keyIdx);
 			if (input)
 			{
+				// deal with field options:
+				if (key.slice(-4) === "|req" || key.slice(-4) === "|cfg" || key.slice(-4) === "|fix" || key.slice(-4) === "|opt")
+				{
+					delete this._dictionary[key];
+					key = key.slice(0, -4);
+				}
 				this._dictionary[key] = input.value;
 			}
 		});
@@ -532,8 +628,11 @@ export class GUI
 		// clear all events (and keypresses) accumulated until now:
 		this._psychoJS.eventManager.clearEvents();
 
-		this._dialog.hide();
-		this._dialog = null;
+		if (this._dialog)
+		{
+			this._dialog.hide();
+			this._dialog = null;
+		}
 		this._dialogComponent.status = PsychoJS.Status.FINISHED;
 	}
 
@@ -613,27 +712,26 @@ export class GUI
 			if (typeof this._okButton !== "undefined")
 			{
 				// locally the OK button is always enabled, otherwise only if all requirements have been fulfilled:
-				if (this._psychoJS.getEnvironment() === ExperimentHandler.Environment.LOCAL || allRequirementsFulfilled)
+				if (
+					(this._OKAlwaysEnabledForLocal && this._psychoJS.getEnvironment() === ExperimentHandler.Environment.LOCAL)
+					|| allRequirementsFulfilled
+				)
 				{
+					this._okButton.classList.add("dialog-button");
+					this._okButton.classList.remove("disabled");
 					if (changeOKButtonFocus)
 					{
-						this._okButton.classList = ["dialog-button"];
 						this._okButton.focus();
-					}
-					else
-					{
-						this._okButton.classList = ["dialog-button"];
 					}
 				}
 				else
 				{
-					this._okButton.classList = ["dialog-button", "disabled"];
+					this._okButton.classList.add("dialog-button", "disabled");
 				}
 			}
 
 			return;
 		}
-
 
 		// if all requirements are fulfilled and the participant is not required to click on the OK button,
 		// then we close the dialog box and move on with the experiment:

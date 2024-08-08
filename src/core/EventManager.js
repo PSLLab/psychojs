@@ -2,8 +2,7 @@
  * Manager handling the keyboard and mouse/touch events.
  *
  * @author Alain Pitiot
- * @version 2022.2.3
- * @copyright (c) 2017-2020 Ilixa Ltd. (http://ilixa.com) (c) 2020-2022 Open Science Tools Ltd. (https://opensciencetools.org)
+ * @copyright (c) 2017-2020 Ilixa Ltd. (http://ilixa.com) (c) 2020-2024 Open Science Tools Ltd. (https://opensciencetools.org)
  * @license Distributed under the terms of the MIT License
  */
 
@@ -302,7 +301,13 @@ export class EventManager
 		{
 			const timestamp = MonotonicClock.getReferenceTime();
 
-			let code = event.code;
+			// Note: we are using event.key since we are interested in the input character rather than
+			// the physical key position on the keyboard, i.e. we need to take into account the keyboard
+			// layout
+			// See https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/code for a comment regarding
+			// event.code's lack of suitability
+			let code = EventManager._pygletMap[event.key];
+			// let code = event.code;
 
 			// take care of legacy Microsoft browsers (IE11 and pre-Chromium Edge):
 			if (typeof code === "undefined")

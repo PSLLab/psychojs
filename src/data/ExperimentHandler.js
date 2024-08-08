@@ -2,8 +2,7 @@
  * Experiment Handler
  *
  * @author Alain Pitiot
- * @version 2022.2.3
- * @copyright (c) 2017-2020 Ilixa Ltd. (http://ilixa.com) (c) 2020-2022 Open Science Tools Ltd. (https://opensciencetools.org)
+ * @copyright (c) 2017-2020 Ilixa Ltd. (http://ilixa.com) (c) 2020-2024 Open Science Tools Ltd. (https://opensciencetools.org)
  * @license Distributed under the terms of the MIT License
  */
 
@@ -96,6 +95,9 @@ export class ExperimentHandler extends PsychObject
 		this._trialsKeys = [];
 		this._trialsData = [];
 		this._currentTrialData = {};
+
+		// whether a header for the .csv result file is necessary:
+		this._isCsvHeaderNeeded = true;
 
 		this._experimentEnded = false;
 	}
@@ -236,9 +238,9 @@ export class ExperimentHandler extends PsychObject
 	 *
 	 * @param {Object} options
 	 * @param {Array.<Object>} [options.attributes] - the attributes to be saved
-	 * @param {boolean} [options.sync=false] - whether or not to communicate with the server in a synchronous manner
+	 * @param {boolean} [options.sync=false] - whether to communicate with the server in a synchronous manner
 	 * @param {string} [options.tag=''] - an optional tag to add to the filename to which the data is saved (for CSV and XLSX saving options)
-	 * @param {boolean} [options.clear=false] - whether or not to clear all experiment results immediately after they are saved (this is useful when saving data in separate chunks, throughout an experiment)
+	 * @param {boolean} [options.clear=false] - whether to clear all experiment results immediately after they are saved (this is useful when saving data in separate chunks, throughout an experiment)
 	 */
 	async save({
 		attributes = [],
@@ -258,7 +260,7 @@ export class ExperimentHandler extends PsychObject
 				const loop = this._loops[l];
 
 				const loopAttributes = ExperimentHandler._getLoopAttributes(loop);
-				for (let a in loopAttributes)
+				for (const a in loopAttributes)
 				{
 					if (loopAttributes.hasOwnProperty(a))
 					{
@@ -266,7 +268,7 @@ export class ExperimentHandler extends PsychObject
 					}
 				}
 			}
-			for (let a in this.extraInfo)
+			for (const a in this.extraInfo)
 			{
 				if (this.extraInfo.hasOwnProperty(a))
 				{
@@ -276,6 +278,7 @@ export class ExperimentHandler extends PsychObject
 		}
 
 		let data = this._trialsData;
+
 		// if the experiment data have to be cleared, we first make a copy of them:
 		if (clear)
 		{
@@ -288,10 +291,28 @@ export class ExperimentHandler extends PsychObject
 		{
 			// note: we use the XLSX library as it automatically deals with header, takes care of quotes,
 			// newlines, etc.
+
+			// we need a header if it is asked for and there is actual data to save:
+			const withHeader = this._isCsvHeaderNeeded && (data.length > 0);
+
+/* INCORRECT: since new attributes can be added throughout the participant session, we need, currently,
+							to upload the whole result data, on each call to save.
+
+			// if we are outputting a header on this occasion, we won't need one thereafter:
+			if (this._isCsvHeaderNeeded)
+			{
+				this._isCsvHeaderNeeded = !withHeader;
+			}
+*/
+
 			// TODO only save the given attributes
-			const worksheet = XLSX.utils.json_to_sheet(data);
-			// prepend BOM
-			const csv = "\ufeff" + XLSX.utils.sheet_to_csv(worksheet);
+			const worksheet = XLSX.utils.json_to_sheet(data, {skipHeader: !withHeader});
+			// note: start with a BOM if necessary
+			let csv = ( (withHeader) ? "\ufeff" : "" ) + XLSX.utils.sheet_to_csv(worksheet);
+			if (data.length > 0)
+			{
+				csv += "\n";
+			}
 
 			// upload data to the pavlovia server or offer them for download:
 			const filenameWithoutPath = this._dataFileName.split(/[\\/]/).pop();
@@ -302,7 +323,7 @@ export class ExperimentHandler extends PsychObject
 				&& !this._psychoJS._serverMsg.has("__pilotToken")
 			)
 			{
-				return /*await*/ this._psychoJS.serverManager.uploadData(key, csv, sync);
+				return this._psychoJS.serverManager.uploadData(key, csv, sync);
 			}
 			else if (this._psychoJS.getEnvironment() === ExperimentHandler.Environment.JATOS) {
 				if (sync) {
@@ -330,7 +351,7 @@ export class ExperimentHandler extends PsychObject
 
 			for (let r = 0; r < data.length; r++)
 			{
-				let doc = {
+				const doc = {
 					__projectId,
 					__experimentName: this._experimentName,
 					__participant: this._participant,
@@ -360,6 +381,19 @@ export class ExperimentHandler extends PsychObject
 				util.offerDataForDownload("results.json", JSON.stringify(documents), "application/json");
 			}
 		}
+	}
+
+	/**
+	 * Get the results of the experiment as a .csv string, ready to be uploaded or stored.
+	 *
+	 * @return {string} a .csv representation of the experiment results.
+	 */
+	getResultAsCsv()
+	{
+		// note: we use the XLSX library as it automatically deals with header, takes care of quotes,
+		// newlines, etc.
+		const worksheet = XLSX.utils.json_to_sheet(this._trialsData);
+		return "\ufeff" + XLSX.utils.sheet_to_csv(worksheet);
 	}
 
 	/**

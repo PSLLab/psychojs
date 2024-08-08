@@ -1,9 +1,10 @@
 /**
- * Manager responsible for the communication between the experiment running in the participant's browser and the pavlovia.org server.
+ * Manager responsible for the communication between the experiment running in the participant's browser and the
+ * pavlovia.org server.
  *
  * @author Alain Pitiot
- * @version 2022.2.3
- * @copyright (c) 2017-2020 Ilixa Ltd. (http://ilixa.com) (c) 2020-2022 Open Science Tools Ltd. (https://opensciencetools.org)
+ * @copyright (c) 2017-2020 Ilixa Ltd. (http://ilixa.com) (c) 2020-2024 Open Science Tools Ltd.
+ *   (https://opensciencetools.org)
  * @license Distributed under the terms of the MIT License
  */
 
@@ -16,8 +17,10 @@ import { Scheduler } from "../util/Scheduler.js";
 import { PsychoJS } from "./PsychoJS.js";
 
 /**
- * <p>This manager handles all communications between the experiment running in the participant's browser and the [pavlovia.org]{@link http://pavlovia.org} server, <em>in an asynchronous manner</em>.</p>
- * <p>It is responsible for reading the configuration file of an experiment, for opening and closing a session, for listing and downloading resources, and for uploading results, logs, and audio recordings.</p>
+ * <p>This manager handles all communications between the experiment running in the participant's browser and the
+ * [pavlovia.org]{@link http://pavlovia.org} server, <em>in an asynchronous manner</em>.</p>
+ * <p>It is responsible for reading the configuration file of an experiment, for opening and closing a session, for
+ * listing and downloading resources, and for uploading results, logs, and audio recordings.</p>
  *
  * @extends PsychObject
  */
@@ -54,6 +57,12 @@ export class ServerManager extends PsychObject
 		this._nbLoadedResources = 0;
 		this._setupPreloadQueue();
 
+		// throttling period for calls to uploadData and uploadLog (in mn):
+		// note: 	(a) the period is potentially updated when a session is opened to reflect that associated with
+		//						the experiment on the back-end database
+		//				(b) throttling is also enforced on the back-end: artificially altering the period
+		//						on the participant's browser will result in server errors
+		this._uploadThrottlePeriod = 5;
 
 		this._addAttribute("autoLog", autoLog);
 		this._addAttribute("status", ServerManager.Status.READY);
@@ -124,11 +133,13 @@ export class ServerManager extends PsychObject
 	 * @property {Object.<string, *>} [error] an error message if we could not open the session
 	 */
 	/**
-	 * Open a session for this experiment on the remote PsychoJS manager.
+	 * Open a session for this experiment on the pavlovia server.
+	 *
+	 * @param {Object} params - the open session parameters
 	 *
 	 * @returns {Promise<ServerManager.OpenSessionPromise>} the response
 	 */
-	openSession()
+	openSession(params = {})
 	{
 		const response = {
 			origin: "ServerManager.openSession",
@@ -137,13 +148,6 @@ export class ServerManager extends PsychObject
 		this._psychoJS.logger.debug("opening a session for experiment: " + this._psychoJS.config.experiment.fullpath);
 
 		this.setStatus(ServerManager.Status.BUSY);
-
-		// prepare a POST query:
-		let data = {};
-		if (this._psychoJS._serverMsg.has("__pilotToken"))
-		{
-			data.pilotToken = this._psychoJS._serverMsg.get("__pilotToken");
-		}
 
 		// query the server:
 		const self = this;
@@ -154,7 +158,7 @@ export class ServerManager extends PsychObject
 				const postResponse = await this._queryServerAPI(
 					"POST",
 					`experiments/${this._psychoJS.config.gitlab.projectId}/sessions`,
-					data,
+					params,
 					"FORM"
 				);
 
@@ -196,6 +200,21 @@ export class ServerManager extends PsychObject
 					self._psychoJS.config.experiment.keys = [];
 				}
 
+				// partial results upload options:
+				if ("partialResultsUploadPeriod" in experiment)
+				{
+					// note: resultsUpload is initialised in PsychoJS._configure but we reinitialise it here
+					// all the same (belt and braces approach)
+					self._psychoJS.config.experiment.resultsUpload = {
+						period: experiment.partialResultsUploadPeriod,
+						intervalId: -1
+					};
+				}
+				if ("uploadThrottlePeriod" in experiment)
+				{
+					this._uploadThrottlePeriod = experiment.uploadThrottlePeriod;
+				}
+
 				self.setStatus(ServerManager.Status.READY);
 				resolve({...response, token: openSessionResponse.token, status: openSessionResponse.status });
 			}
@@ -212,13 +231,14 @@ export class ServerManager extends PsychObject
 	 * @typedef ServerManager.CloseSessionPromise
 	 * @property {string} origin the calling method
 	 * @property {string} context the context
-	 * @property {Object.<string, *>} [error] an error message if we could not close the session (e.g. if it has not previously been opened)
+	 * @property {Object.<string, *>} [error] an error message if we could not close the session (e.g. if it has not
+	 *   previously been opened)
 	 */
 	/**
-	 * Close the session for this experiment on the remote PsychoJS manager.
+	 * Close the session for this experiment on the pavlovia server.
 	 *
-	 * @param {boolean} [isCompleted= false] - whether or not the experiment was completed
-	 * @param {boolean} [sync= false] - whether or not to communicate with the server in a synchronous manner
+	 * @param {boolean} [isCompleted= false] - whether the experiment was completed
+	 * @param {boolean} [sync= false] - whether to communicate with the server in a synchronous manner
 	 * @returns {Promise<ServerManager.CloseSessionPromise> | void} the response
 	 */
 	async closeSession(isCompleted = false, sync = false)
@@ -239,6 +259,10 @@ export class ServerManager extends PsychObject
 				+ "/sessions/"  + this._psychoJS.config.session.token + "/delete";
 			const formData = new FormData();
 			formData.append("isCompleted", isCompleted);
+			if (typeof this._psychoJS._surveyId !== "undefined")
+			{
+				formData.append("surveyId", this._psychoJS._surveyId);
+			}
 
 			navigator.sendBeacon(url, formData);
 			this._psychoJS.config.session.status = "CLOSED";
@@ -251,10 +275,18 @@ export class ServerManager extends PsychObject
 			{
 				try
 				{
+					const data = {
+						isCompleted
+					};
+					if (typeof this._psychoJS._surveyId !== "undefined")
+					{
+						data["surveyId"] = this._psychoJS._surveyId;
+					}
+
 					const deleteResponse = await this._queryServerAPI(
 						"DELETE",
 						`experiments/${this._psychoJS.config.gitlab.projectId}/sessions/${this._psychoJS.config.session.token}`,
-						{ isCompleted },
+						data,
 						"FORM"
 					);
 
@@ -316,6 +348,34 @@ export class ServerManager extends PsychObject
 	}
 
 	/**
+	 * Release a resource.
+	 *
+	 * @param {string} name - the name of the resource to release
+	 * @return {boolean} true if a resource with the given name was previously registered with the manager,
+	 * 	false otherwise.
+	 */
+	releaseResource(name)
+	{
+		const response = {
+			origin: "ServerManager.releaseResource",
+			context: "when releasing resource: " + name,
+		};
+
+		const pathStatusData = this._resources.get(name);
+
+		if (typeof pathStatusData === "undefined")
+		{
+			return false;
+		}
+
+		// TODO check the current status: prevent the release of a resources currently downloading
+
+		this._psychoJS.logger.debug(`releasing resource: ${name}`);
+		this._resources.delete(name);
+		return true;
+	}
+
+	/**
 	 * Get the status of a single resource or the reduced status of an array of resources.
 	 *
 	 * <p>If an array of resources is given, getResourceStatus returns a single, reduced status
@@ -331,7 +391,8 @@ export class ServerManager extends PsychObject
 	 * </p>
 	 *
 	 * @param {string | string[]} names names of the resources whose statuses are requested
-	 * @return {module:core.ServerManager.ResourceStatus} status of the resource if there is only one, or reduced status otherwise
+	 * @return {module:core.ServerManager.ResourceStatus} status of the resource if there is only one, or reduced status
+	 *   otherwise
 	 * @throws {Object.<string, *>} if at least one of the names is not that of a previously
 	 * 	registered resource
 	 */
@@ -433,7 +494,8 @@ export class ServerManager extends PsychObject
 	 *   <li>If resources is null, then we do not download any resources</li>
 	 * </ul>
 	 *
-	 * @param {String | Array.<{name: string, path: string, download: boolean} | String | Symbol>} [resources=[]] - the list of resources or a single resource
+	 * @param {String | Array.<{name: string, path: string, download: boolean} | String | Symbol>} [resources=[]] - the
+	 *   list of resources or a single resource
 	 */
 	async prepareResources(resources = [])
 	{
@@ -502,17 +564,74 @@ export class ServerManager extends PsychObject
 						throw "resources must be manually specified when the experiment is running locally: ALL_RESOURCES cannot be used";
 					}
 
-					// convert those resources that are only a string to an object with name and path:
+					// pre-process the resources:
 					for (let r = 0; r < resources.length; ++r)
 					{
-						const resource = resources[r];
-						if (typeof resource === "string")
+						// convert those resources that are only a string to an object with name and path:
+						if (typeof resources[r] === "string")
 						{
 							resources[r] = {
-								name: resource,
-								path: resource,
+								name: resources[r],
+								path: resources[r],
 								download: true
+							};
+						}
+
+						const resource = resources[r];
+
+						// deal with survey models:
+						if ("surveyId" in resource)
+						{
+							// survey models can only be downloaded if the experiment is hosted on the pavlovia.org server:
+							if (this._psychoJS.config.environment !== ExperimentHandler.Environment.SERVER)
+							{
+								throw "survey models cannot be downloaded when the experiment is running locally";
 							}
+
+							// we add a .sid extension so _downloadResources knows what to download the associated
+							// survey model from the server
+							resources[r] = {
+								name: `${resource["surveyId"]}.sid`,
+								path: resource["surveyId"],
+								download: true
+							};
+						}
+
+						// deal with survey libraries:
+						if ("surveyLibrary" in resource)
+						{
+							// add the SurveyJS and PsychoJS Survey .js and .css resources:
+							resources[r] = {
+								name: "jquery-3.5.1.min.js",
+								path: "./lib/vendors/jquery-3.5.1.min.js",
+								// name: "jquery-3.6.0.min.js",
+								// path: "./lib/vendors/jquery-3.6.0.min.js",
+								download: true
+							};
+							resources.push({
+								name: "surveyjs.jquery-1.9.126.min.js",
+								path: "./lib/vendors/surveyjs.jquery-1.9.126.min.js",
+								// name: "survey.jquery-1.9.50.min.js",
+								// path: "./lib/vendors/survey.jquery-1.9.50.min.js",
+								download: true
+							});
+							resources.push({
+								name: "surveyjs.defaultV2-1.9.126-OST.min.css",
+								path: "./lib/vendors/surveyjs.defaultV2-1.9.126-OST.min.css",
+								// name: "survey.defaultV2-1.9.50.min.css",
+								// path: "./lib/vendors/survey.defaultV2-1.9.50.min.css",
+								download: true
+							});
+							resources.push({
+								name: "survey.widgets.css",
+								path: "./lib/vendors/survey.widgets.css",
+								download: true
+							});
+							resources.push({
+								name: "survey.grey_style.css",
+								path: "./lib/vendors/survey.grey_style.css",
+								download: true
+							});
 						}
 					}
 
@@ -629,7 +748,7 @@ export class ServerManager extends PsychObject
 						&& (path.indexOf("pavlovia.org") === -1)
 					)
 					{
-						path = "https://devlovia.org/api/v2/proxy/" + path;
+						path = "https://pavlovia.org/api/v2/proxy/" + path;
 					}
 
 					const pathStatusData = this._resources.get(name);
@@ -703,6 +822,15 @@ export class ServerManager extends PsychObject
 		};
 		this._psychoJS.logger.debug("uploading data for experiment: " + this._psychoJS.config.experiment.fullpath);
 
+		// data upload throttling:
+		const now = MonotonicClock.getReferenceTime();
+		const checkThrottling = (typeof this._psychoJS.config.experiment.resultsUpload.lastUploadTimestamp !== "undefined");
+		if (checkThrottling && (now - this._psychoJS.config.experiment.resultsUpload.lastUploadTimestamp < this._uploadThrottlePeriod * 60))
+		{
+			return Promise.reject({ ...response, error: "upload canceled by throttling"});
+		}
+		this._psychoJS.config.experiment.resultsUpload.lastUploadTimestamp = now;
+
 		this.setStatus(ServerManager.Status.BUSY);
 
 		const path = `experiments/${this._psychoJS.config.gitlab.projectId}/sessions/${this._psychoJS.config.session.token}/results`;
@@ -729,7 +857,6 @@ export class ServerManager extends PsychObject
 						{ key, value },
 						"FORM"
 					);
-
 					const uploadDataResponse = await postResponse.json();
 
 					if (postResponse.status !== 200)
@@ -818,8 +945,10 @@ export class ServerManager extends PsychObject
 	 * @param {string} options.tag - additional tag
 	 * @param {boolean} [options.waitForCompletion=false] - whether or not to wait for completion
 	 * 	before returning
-	 * @param {boolean} [options.showDialog=false] - whether or not to open a dialog box to inform the participant to wait for the data to be uploaded to the server
-	 * @param {string} [options.dialogMsg="Please wait a few moments while the data is uploading to the server"] - default message informing the participant to wait for the data to be uploaded to the server
+	 * @param {boolean} [options.showDialog=false] - whether or not to open a dialog box to inform the participant to
+	 *   wait for the data to be uploaded to the server
+	 * @param {string} [options.dialogMsg="Please wait a few moments while the data is uploading to the server"] -
+	 *   default message informing the participant to wait for the data to be uploaded to the server
 	 * @returns {Promise<ServerManager.UploadDataPromise>} the response
 	 */
 	async uploadAudioVideo({mediaBlob, tag, waitForCompletion = false, showDialog = false, dialogMsg = "Please wait a few moments while the data is uploading to the server"})
@@ -943,6 +1072,136 @@ export class ServerManager extends PsychObject
 	}
 
 	/**
+	 * Asynchronously upload a survey response to the pavlovia server.
+	 *
+	 * @returns {Promise<ServerManager.UploadDataPromise>} a promise resolved when the survey response has been uploaded
+	 */
+	async uploadSurveyResponse(surveyId, surveyResponse, isComplete)
+	{
+		const response = {
+			origin: "ServerManager.uploadSurveyResponse",
+			context: `when uploading the survey response for experiment: ${this._psychoJS.config.experiment.fullpath} and survey: ${surveyId}`
+		};
+
+		if (this._psychoJS.getEnvironment() !== ExperimentHandler.Environment.SERVER ||
+			this._psychoJS.config.experiment.status !== "RUNNING" ||
+			this._psychoJS._serverMsg.has("__pilotToken"))
+		{
+			throw "survey responses can only be uploaded to the server for experiments running on the server";
+		}
+
+		this._psychoJS.logger.debug(`uploading a survey response for experiment: ${this._psychoJS.config.experiment.fullpath} and survey: ${surveyId}`);
+		this.setStatus(ServerManager.Status.BUSY);
+
+		const self = this;
+		return new Promise(async (resolve, reject) =>
+		{
+			try
+			{
+				const info = this._psychoJS.experiment.extraInfo;
+				const participant = (typeof info.participant === "string" && info.participant.length > 0) ?
+					info.participant :
+					"PARTICIPANT";
+
+				const postResponse = await this._queryServerAPI(
+					"POST",
+					`surveys/${surveyId}`,
+					{
+						experimentId: this._psychoJS.config.gitlab.projectId,
+						sessionToken: this._psychoJS.config.session.token,
+						participant: participant,
+						surveyResponse,
+						isComplete
+					},
+					"JSON"
+				);
+				const uploadDataResponse = await postResponse.json();
+
+				if (postResponse.status !== 200)
+				{
+					throw ('error' in uploadDataResponse) ? uploadDataResponse.error : uploadDataResponse;
+				}
+
+				self.setStatus(ServerManager.Status.READY);
+				resolve({ ...response, ...uploadDataResponse });
+			}
+			catch (error)
+			{
+				console.error(error);
+				self.setStatus(ServerManager.Status.ERROR);
+				reject({...response, error});
+			}
+		});
+	}
+
+	/**
+	 * Asynchronously get a survey's experiment parameters from the pavlovia server, and update experimentInfo
+	 *
+	 * @note only those fields not previously defined in experimentInfo are updated
+	 *
+	 * @param surveyId
+	 * @param experimentInfo
+	 * @returns {Promise} a promise resolved when the survey experiment parameters have been downloaded
+	 */
+	async getSurveyExperimentParameters(surveyId, experimentInfo)
+	{
+		const response = {
+			origin: "ServerManager.getSurveyExperimentParameters",
+			context: `when downloading the experiment parameters for survey: ${surveyId}`
+		};
+
+		if (this._psychoJS.getEnvironment() !== ExperimentHandler.Environment.SERVER)
+		{
+			throw "survey experiment parameters cannot be downloaded when the experiment is running locally";
+		}
+
+		this._psychoJS.logger.debug(`downloading the experiment parameters of survey: ${surveyId}`);
+		this.setStatus(ServerManager.Status.BUSY);
+
+		const self = this;
+		return new Promise(async (resolve, reject) =>
+		{
+			try
+			{
+				const getResponse = await this._queryServerAPI(
+					"GET",
+					`surveys/${surveyId}/experiment`
+				);
+				const getExperimentParametersResponse = await getResponse.json();
+
+				if (getResponse.status !== 200)
+				{
+					throw ('error' in getExperimentParametersResponse) ? getExperimentParametersResponse.error : getExperimentParametersResponse;
+				}
+
+				if (getExperimentParametersResponse["experimentParameters"] === null)
+				{
+					throw "either there is no survey with the given id, or it is not currently active";
+				}
+
+				// update the info with the survey experiment parameters:
+				const experimentParameters = getExperimentParametersResponse['experimentParameters'];
+				for (const parameter in experimentParameters)
+				{
+					if (typeof experimentInfo[parameter] === "undefined")
+					{
+						experimentInfo[parameter] = experimentParameters[parameter];
+					}
+				}
+
+				self.setStatus(ServerManager.Status.READY);
+				resolve({ ...response, ...getExperimentParametersResponse });
+			}
+			catch (error)
+			{
+				console.error(error);
+				self.setStatus(ServerManager.Status.ERROR);
+				reject({...response, error});
+			}
+		});
+	}
+
+	/**
 	 * List the resources available to the experiment.
 	 *
 	 * @protected
@@ -1023,10 +1282,12 @@ export class ServerManager extends PsychObject
 		});
 
 		// based on the resource extension either (a) add it to the preload manifest, (b) mark it for
-		// download by howler, or (c) add it to the document fonts
+		// download by howler, (c) add it to the document fonts, or (d) download the associated survey model
+		// from the server
 		const preloadManifest = [];
 		const soundResources = new Set();
 		const fontResources = [];
+		const surveyModelResources = [];
 		for (const name of resources)
 		{
 			const nameParts = name.toLowerCase().split(".");
@@ -1079,10 +1340,16 @@ export class ServerManager extends PsychObject
 				}
 			}
 
-			// font files
-			else if (["ttf", "otf", "woff", "woff2"].indexOf(pathExtension) > -1)
+			// font files:
+			else if (["ttf", "otf", "woff", "woff2","eot"].indexOf(pathExtension) > -1)
 			{
 				fontResources.push(name);
+			}
+
+			// survey models:
+			else if (["sid"].indexOf(extension) > -1)
+			{
+				surveyModelResources.push(name);
 			}
 
 			// all other extensions handled by preload.js (download type decided by preload.js):
@@ -1155,8 +1422,64 @@ export class ServerManager extends PsychObject
 			}
 		}
 
-		// start loading resources marked for howler.js:
+		// start loading the survey models:
 		const self = this;
+		for (const name of surveyModelResources)
+		{
+			const pathStatusData = this._resources.get(name);
+			pathStatusData.status = ServerManager.ResourceStatus.DOWNLOADING;
+			this.emit(ServerManager.Event.RESOURCE, {
+				message: ServerManager.Event.DOWNLOADING_RESOURCE,
+				resource: name,
+			});
+
+			try
+			{
+				const getResponse = await this._queryServerAPI("GET", `surveys/${pathStatusData.path}/model`);
+
+				const getModelResponse = await getResponse.json();
+
+				if (getResponse.status !== 200)
+				{
+					const error = ("error" in getModelResponse) ? getModelResponse.error : getModelResponse;
+					throw util.toString(error);
+				}
+
+				if (getModelResponse["model"] === null)
+				{
+					throw "either there is no survey with the given id, or it is not currently active";
+				}
+
+				++self._nbLoadedResources;
+
+				// note: we encode the json model as a string since it will be decoded in Survey.setModel,
+				// just like the model loaded directly from a resource by preloadJS
+				pathStatusData.data = new TextEncoder().encode(JSON.stringify(getModelResponse['model']));
+
+				pathStatusData.status = ServerManager.ResourceStatus.DOWNLOADED;
+				self.emit(ServerManager.Event.RESOURCE, {
+					message: ServerManager.Event.RESOURCE_DOWNLOADED,
+					resource: name,
+				});
+
+				if (self._nbLoadedResources === resources.size)
+				{
+					self.setStatus(ServerManager.Status.READY);
+					self.emit(ServerManager.Event.RESOURCE, {
+						message: ServerManager.Event.DOWNLOAD_COMPLETED,
+					});
+				}
+			}
+			catch(error)
+			{
+				console.error(error);
+				self.setStatus(ServerManager.Status.ERROR);
+				throw { ...response, error: `unable to download resource: ${name}: ${util.toString(error)}` };
+			}
+		}
+
+		// start loading resources marked for howler.js:
+		// TODO load them sequentially, not all at once!
 		for (const name of soundResources)
 		{
 			const pathStatusData = this._resources.get(name);
@@ -1209,8 +1532,8 @@ export class ServerManager extends PsychObject
 	_setupPreloadQueue()
 	{
 		const response = {
-			origin: "ServerManager._setupPreloadQueue",
-			context: "when setting up a preload queue"
+			origin: "ServerManager.[preload]",
+			context: "when downloading resources"
 		};
 
 		this._preloadQueue = new createjs.LoadQueue(true, "", true);
@@ -1367,7 +1690,8 @@ export class ServerManager extends PsychObject
 /**
  * Server event
  *
- * <p>A server event is emitted by the manager to inform its listeners of either a change of status, or of a resource related event (e.g. download started, download is completed).</p>
+ * <p>A server event is emitted by the manager to inform its listeners of either a change of status, or of a resource
+ * related event (e.g. download started, download is completed).</p>
  *
  * @enum {Symbol}
  * @readonly
