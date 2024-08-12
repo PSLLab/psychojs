@@ -146,7 +146,13 @@ export class GUI
 				markup += "<div class='dialog-content'>";
 
 				// alert title and close button:
-				markup += `<div id='experiment-dialog-title' class='dialog-title'><p>${title}</p></div>`;
+				markup += "<div id='experiment-dialog-title' class='dialog-title'>";
+				markup += `<p>${title}</p>`;
+				markup += "<button id='dialogClose' class='dialog-close' data-a11y-dialog-hide aria-label='Cancel Experiment'>&times;</button>";
+				markup += "</div>";
+
+				// everything above the buttons is in a scrollable container:
+				markup += "<div class='scrollable-container'>";
 
 				// logo, if need be:
 				if (typeof logoUrl === "string")
@@ -246,9 +252,8 @@ export class GUI
 				markup += "<div class='progress-container'><div id='progressBar' class='progress-bar'></div></div>";
 
 				// buttons:
-				markup += "<hr>";
+				markup += "<div class='dialog-button-group'>";
 				if (self._psychoJS.getEnvironment() !== ExperimentHandler.Environment.JATOS) {
-					markup += "<div class='dialog-button-group'>";
 					markup += "<button id='dialogCancel' class='dialog-button' aria-label='Cancel Experiment'>Cancel</button>";
 				}
 				if (self._requireParticipantClick)
